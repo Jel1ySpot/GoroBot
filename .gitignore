@@ -1,0 +1,5 @@
+/build
+/.idea
+
+/some.go
+/plugins
