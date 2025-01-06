@@ -20,13 +20,13 @@ func (s *Service) login() error {
 	qqClient.UseVersion(appInfo)
 	qqClient.AddSignServer(s.config.SignServerUrl)
 
-	deviceInfo, err := auth.LoadOrSaveDevice(path.Join(ConfigPath, "device.json"))
+	deviceInfo, err := auth.LoadOrSaveDevice(path.Join(DefaultConfigPath, "device.json"))
 	if err != nil {
 		return err
 	}
 	qqClient.UseDevice(deviceInfo)
 
-	data, err := os.ReadFile(path.Join(ConfigPath, s.config.Account.SigPath))
+	data, err := os.ReadFile(path.Join(DefaultConfigPath, s.config.Account.SigPath))
 	if err == nil {
 		sig, err := auth.UnmarshalSigInfo(data, true)
 		if err != nil {

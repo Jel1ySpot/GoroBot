@@ -1,5 +1,5 @@
 /build
 /.idea
 
-/some.go
+/main.go
 /plugins
