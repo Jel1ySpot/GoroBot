@@ -1,8 +1,8 @@
 package GoroBot
 
 import (
+	"database/sql"
 	"fmt"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/bot"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/event"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/logger"
 	"github.com/Jel1ySpot/GoroBot/pkg/util"
@@ -19,11 +19,15 @@ const (
 type Instant struct {
 	services []Service
 	logger   logger.Inst
-	contexts map[string]bot.Context
+	db       *sql.DB
+	contexts map[string]BotContext
 	config   Config
 
 	event      *event.System
 	middleware *MiddlewareSystem
+
+	// 没有连接数据库时使用
+	resourceMap map[string]Resource
 }
 
 func Create() *Instant {
@@ -32,7 +36,7 @@ func Create() *Instant {
 		logger: &logger.DefaultLogger{
 			LogLevel: logger.Info,
 		},
-		contexts: map[string]bot.Context{},
+		contexts: map[string]BotContext{},
 		event:    event.NewEventSystem(),
 		middleware: &MiddlewareSystem{
 			middlewares: make(map[string]MiddlewareCallback),
@@ -41,6 +45,8 @@ func Create() *Instant {
 			Owner:    make(map[string]string),
 			LogLevel: logger.Info,
 		},
+
+		resourceMap: make(map[string]Resource),
 	}
 
 	inst.EventRegister("message")
@@ -98,7 +104,7 @@ func (i *Instant) releaseServices() {
 	}
 }
 
-func (i *Instant) AddContext(context bot.Context) bool {
+func (i *Instant) AddContext(context BotContext) bool {
 	if _, ok := i.contexts[context.Name()]; ok {
 		return false
 	}
@@ -106,7 +112,7 @@ func (i *Instant) AddContext(context bot.Context) bool {
 	return true
 }
 
-func (i *Instant) GetContext(id string) bot.Context {
+func (i *Instant) GetContext(id string) BotContext {
 	if context, ok := i.contexts[id]; ok {
 		return context
 	}

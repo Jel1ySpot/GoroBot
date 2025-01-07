@@ -2,7 +2,6 @@ package message_logger
 
 import (
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/bot"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/logger"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/message"
 )
@@ -26,7 +25,7 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 	s.bot = grb
 	s.logger = grb.GetLogger()
 
-	s.releaseFunc, _ = grb.On(GoroBot.MessageEvent(func(ctx bot.Context, msg message.Context) error {
+	s.releaseFunc, _ = grb.On(GoroBot.MessageEvent(func(ctx GoroBot.BotContext, msg message.Context) error {
 		s.log(msg)
 		return nil
 	}))
@@ -35,7 +34,9 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 }
 
 func (s *Service) Release(grb *GoroBot.Instant) error {
-	s.releaseFunc()
+	if s.releaseFunc != nil {
+		s.releaseFunc()
+	}
 	return nil
 }
 

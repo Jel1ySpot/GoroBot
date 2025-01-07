@@ -1,19 +1,20 @@
-package bot
+package GoroBot
 
 import (
 	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/message"
 )
 
-type Context interface {
+type BotContext interface {
 	ID() string
 	Name() string
 	Protocol() string
 	Status() LoginStatus
-	SendDirectMessage(target entity.User, message []*message.Element) error
-	SendGroupMessage(target entity.Group, message []*message.Element) error
 	Contacts() []entity.User
 	Groups() []entity.Group
+	SendDirectMessage(target entity.User, message []*message.Element) error
+	SendGroupMessage(target entity.Group, message []*message.Element) error
+	GetMessageFileUrl(msg *message.Base) (string, error)
 }
 
 type LoginStatus int

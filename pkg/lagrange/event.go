@@ -2,9 +2,8 @@ package lagrange
 
 import (
 	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/message"
 	"github.com/LagrangeDev/LagrangeGo/client"
-	lgrMessage "github.com/LagrangeDev/LagrangeGo/message"
+	LgrMessage "github.com/LagrangeDev/LagrangeGo/message"
 	"github.com/google/shlex"
 	"strings"
 )
@@ -16,51 +15,33 @@ func (s *Service) eventSubscribe() error {
 		s.logger.Warning("连接已断开：%v", event.Message)
 	})
 
-	qqClient.GroupMessageEvent.Subscribe(func(client *client.QQClient, event *lgrMessage.GroupMessage) {
-		ctx := MessageContext{
-			messageType: message.GroupMessage,
-			service:     s,
-			groupMsg:    event,
-		}
-		if strings.HasPrefix(event.ToString(), s.config.CommandPrefix) {
-			tokens, _ := shlex.Split(ctx.String()[len(s.config.CommandPrefix):])
-			_ = s.bot.CommandEmit(
-				&Context{service: s},
-				&command.Context{
-					Context: &ctx,
-					Tokens:  tokens,
-				},
-			)
-		} else {
-			_ = s.bot.MessageEmit(
-				&Context{service: s},
-				&ctx,
-			)
-		}
+	qqClient.GroupMessageEvent.Subscribe(func(client *client.QQClient, event *LgrMessage.GroupMessage) {
+		s.messageEventHandler(event)
 	})
 
-	qqClient.PrivateMessageEvent.Subscribe(func(client *client.QQClient, event *lgrMessage.PrivateMessage) {
-		ctx := MessageContext{
-			messageType: message.DirectMessage,
-			service:     s,
-			privateMsg:  event,
-		}
-		if strings.HasPrefix(event.ToString(), s.config.CommandPrefix) {
-			tokens, _ := shlex.Split(ctx.String()[len(s.config.CommandPrefix):])
-			_ = s.bot.CommandEmit(
-				&Context{service: s},
-				&command.Context{
-					Context: &ctx,
-					Tokens:  tokens,
-				},
-			)
-		} else {
-			_ = s.bot.MessageEmit(
-				&Context{service: s},
-				&ctx,
-			)
-		}
+	qqClient.PrivateMessageEvent.Subscribe(func(client *client.QQClient, event *LgrMessage.PrivateMessage) {
+		s.messageEventHandler(event)
 	})
 
 	return nil
+}
+
+func (s *Service) messageEventHandler(event any) {
+	msg := NewMessageContext(event, s)
+	go s.parseResources(msg.OriginalElements(), msg.GroupUin())
+	if strings.HasPrefix(msg.String(), s.config.CommandPrefix) {
+		tokens, _ := shlex.Split(msg.String()[len(s.config.CommandPrefix):])
+		_ = s.bot.CommandEmit(
+			&Context{service: s},
+			&command.Context{
+				Context: msg,
+				Tokens:  tokens,
+			},
+		)
+	} else {
+		_ = s.bot.MessageEmit(
+			&Context{service: s},
+			msg,
+		)
+	}
 }

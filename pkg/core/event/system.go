@@ -21,6 +21,10 @@ func (sys *System) Register(event string) {
 	}
 }
 
+func (sys *System) Unregister(event string) {
+	delete(sys.events, event)
+}
+
 func (sys *System) On(event string, callback Callback) (func(), error) {
 	if _, ok := sys.events[event]; !ok {
 		return nil, errors.New("event not found")

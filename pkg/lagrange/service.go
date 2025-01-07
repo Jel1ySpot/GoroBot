@@ -2,7 +2,6 @@ package lagrange
 
 import (
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/bot"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/logger"
 	"github.com/Jel1ySpot/conic"
 	"github.com/LagrangeDev/LagrangeGo/client"
@@ -21,7 +20,7 @@ type Service struct {
 	qqClient   *client.QQClient
 	bot        *GoroBot.Instant
 	owner      uint32
-	status     bot.LoginStatus
+	status     GoroBot.LoginStatus
 
 	conic  *conic.Conic
 	logger logger.Inst
@@ -34,12 +33,15 @@ func (s *Service) Name() string {
 func Create() *Service {
 	return &Service{
 		conic:      conic.New(),
-		status:     bot.Offline,
+		status:     GoroBot.Offline,
 		ConfigPath: DefaultConfigPath,
 	}
 }
 
 func (s *Service) Init(grb *GoroBot.Instant) error {
+	// https://blog.csdn.net/weixin_45760685/article/details/140629746
+	os.Setenv("GODEBUG", "tlsrsakex=1")
+
 	s.bot = grb
 	s.logger = grb.GetLogger()
 	if id, ok := grb.GetOwner("qq"); ok {
@@ -57,6 +59,10 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 	if err := s.login(); err != nil {
 		return err
 	}
+
+	s.status = GoroBot.Online
+
+	grb.AddContext(&Context{s})
 
 	return nil
 }

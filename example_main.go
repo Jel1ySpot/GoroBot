@@ -3,7 +3,6 @@ package main
 import (
 	"github.com/Jel1ySpot/GoroBot/example_plugin/message_logger"
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/bot"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/message"
 	LgrClient "github.com/Jel1ySpot/GoroBot/pkg/lagrange"
 )
@@ -17,7 +16,7 @@ func main() {
 	grb.Use(message_logger.Create())
 
 	var del func()
-	del, _ = grb.On(GoroBot.MessageEvent(func(ctx bot.Context, msg message.Context) error {
+	del, _ = grb.On(GoroBot.MessageEvent(func(ctx GoroBot.BotContext, msg message.Context) error {
 		if msg.String() == "ping" {
 			_ = msg.ReplyText("🏓")
 			del()

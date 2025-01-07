@@ -18,7 +18,7 @@ type Base struct {
 	ID          string
 	Content     string
 	Elements    []*Element
-	Sender      entity.Sender
+	Sender      *entity.Sender
 	Time        time.Time
 }
 

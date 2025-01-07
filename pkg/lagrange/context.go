@@ -1,11 +1,13 @@
 package lagrange
 
 import (
-	"github.com/Jel1ySpot/GoroBot/pkg/core/bot"
+	"fmt"
+	"github.com/Jel1ySpot/GoroBot/pkg/core"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/message"
 	lgrEntity "github.com/LagrangeDev/LagrangeGo/client/entity"
 	"strconv"
+	"strings"
 )
 
 type Context struct {
@@ -21,10 +23,10 @@ func (ctx *Context) Name() string {
 }
 
 func (ctx *Context) Protocol() string {
-	return "qq"
+	return "lagrange"
 }
 
-func (ctx *Context) Status() bot.LoginStatus {
+func (ctx *Context) Status() GoroBot.LoginStatus {
 	return ctx.service.status
 }
 
@@ -54,6 +56,41 @@ func (ctx *Context) SendGroupMessage(target entity.Group, elements []*message.El
 		return err
 	}
 	return nil
+}
+
+func (ctx *Context) GetMessageFileUrl(msg *message.Base) (string, error) {
+	var elem *message.Element
+	for _, elem = range msg.Elements {
+		if elem.Type == message.File {
+			break
+		}
+	}
+	if elem == nil || elem.Type != message.File {
+		return "", fmt.Errorf("file element not exist")
+	}
+
+	var (
+		msgProtocol string
+		fileDetail  string
+	)
+	if n, err := fmt.Sscanf(elem.Source, "%s:%s", &msgProtocol, &fileDetail); err != nil || n != 2 {
+		return "", fmt.Errorf("invalid source format")
+	}
+	args := strings.Split(fileDetail, "&")
+	if msgProtocol != "lagrange" {
+		return "", fmt.Errorf("protocol not match")
+	}
+	switch msg.MessageType {
+	case message.DirectMessage:
+		return ctx.service.qqClient.GetPrivateFileURL(args[0], args[1])
+	case message.GroupMessage:
+		id, err := strconv.ParseUint(args[0], 10, 32)
+		if err != nil {
+			return "", fmt.Errorf("parse file detail error: %v", err)
+		}
+		return ctx.service.qqClient.GetGroupFileURL(uint32(id), args[1])
+	}
+	return "", nil
 }
 
 func (ctx *Context) Contacts() []entity.User {

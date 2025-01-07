@@ -1,13 +1,12 @@
 package GoroBot
 
 import (
-	"github.com/Jel1ySpot/GoroBot/pkg/core/bot"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/message"
 	"github.com/google/uuid"
 	"sync"
 )
 
-type MiddlewareCallback func(bot bot.Context, msg message.Context, next func(...MiddlewareCallback) error) error
+type MiddlewareCallback func(bot BotContext, msg message.Context, next func(...MiddlewareCallback) error) error
 
 type MiddlewareSystem struct {
 	middlewares map[string]MiddlewareCallback
@@ -49,7 +48,7 @@ func (sys *MiddlewareSystem) add(callback MiddlewareCallback, prepare bool) func
 	}
 }
 
-func (sys *MiddlewareSystem) dispatch(bot bot.Context, msg message.Context, fn func() error) error {
+func (sys *MiddlewareSystem) dispatch(bot BotContext, msg message.Context, fn func() error) error {
 	sys.mu.Lock()
 	defer sys.mu.Unlock()
 

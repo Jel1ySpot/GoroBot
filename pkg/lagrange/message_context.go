@@ -1,7 +1,6 @@
 package lagrange
 
 import (
-	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/message"
 	LgrMessage "github.com/LagrangeDev/LagrangeGo/message"
 	"strconv"
@@ -13,6 +12,28 @@ type MessageContext struct {
 	service     *Service
 	privateMsg  *LgrMessage.PrivateMessage
 	groupMsg    *LgrMessage.GroupMessage
+}
+
+func (m *MessageContext) Protocol() string {
+	return "lagrange"
+}
+
+func NewMessageContext(msg any, service *Service) *MessageContext {
+	switch msg := msg.(type) {
+	case *LgrMessage.PrivateMessage:
+		return &MessageContext{
+			messageType: message.DirectMessage,
+			service:     service,
+			privateMsg:  msg,
+		}
+	case *LgrMessage.GroupMessage:
+		return &MessageContext{
+			messageType: message.GroupMessage,
+			service:     service,
+			groupMsg:    msg,
+		}
+	}
+	return nil
 }
 
 func (m *MessageContext) String() string {
@@ -32,30 +53,48 @@ func (m *MessageContext) Message() *message.Base {
 			MessageType: m.messageType,
 			ID:          strconv.FormatUint(uint64(m.privateMsg.ID), 10),
 			Content:     m.String(),
-			Elements:    m.service.FromMessageElements(m.privateMsg.Elements, message.DirectMessage),
-			Sender: entity.Sender{
-				User: SenderToUser(m.privateMsg.Sender),
-			},
-			Time: time.Unix(int64(m.privateMsg.Time), 0),
+			Elements:    m.service.FromMessageElements(m.privateMsg.Elements, m.privateMsg),
+			Sender:      SenderConv(m.Sender(), m.groupMsg),
+			Time:        time.Unix(int64(m.privateMsg.Time), 0),
 		}
 	case message.GroupMessage:
 		return &message.Base{
 			MessageType: m.messageType,
 			ID:          strconv.FormatUint(uint64(m.groupMsg.ID), 10),
 			Content:     m.String(),
-			Elements:    m.service.FromMessageElements(m.groupMsg.Elements, message.GroupMessage),
-			Sender: entity.Sender{
-				User: SenderToUser(m.groupMsg.Sender),
-				From: strconv.FormatUint(uint64(m.groupMsg.GroupUin), 10),
-			},
-			Time: time.Unix(int64(m.groupMsg.Time), 0),
+			Elements:    m.service.FromMessageElements(m.groupMsg.Elements, m.groupMsg),
+			Sender:      SenderConv(m.Sender(), m.groupMsg),
+			Time:        time.Unix(int64(m.groupMsg.Time), 0),
 		}
 	}
 	return nil
 }
 
-func (m *MessageContext) Protocol() string {
-	return "qq"
+func (m *MessageContext) OriginalElements() []LgrMessage.IMessageElement {
+	switch m.messageType {
+	case message.DirectMessage:
+		return m.privateMsg.Elements
+	case message.GroupMessage:
+		return m.groupMsg.Elements
+	}
+	return nil
+}
+
+func (m *MessageContext) Sender() *LgrMessage.Sender {
+	switch m.messageType {
+	case message.DirectMessage:
+		return m.privateMsg.Sender
+	case message.GroupMessage:
+		return m.groupMsg.Sender
+	}
+	return nil
+}
+
+func (m *MessageContext) GroupUin() uint32 {
+	if m.groupMsg != nil {
+		return m.groupMsg.GroupUin
+	}
+	return 0
 }
 
 func (m *MessageContext) Reply(msg []*message.Element) error {
