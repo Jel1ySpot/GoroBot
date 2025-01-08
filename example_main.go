@@ -7,7 +7,7 @@ import (
 	LgrClient "github.com/Jel1ySpot/GoroBot/pkg/lagrange"
 )
 
-func main() {
+func example_main() {
 	grb := GoroBot.Create()
 
 	lgr := LgrClient.Create()
