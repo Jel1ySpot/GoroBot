@@ -13,7 +13,7 @@ func (s *Service) parseResources(elements []LgrMessage.IMessageElement, groupUin
 				s.logger.Warning("save voice err: %v", err)
 			}
 		case *LgrMessage.ImageElement:
-			if err := s.saveImageResource(elem); err != nil {
+			if err := s.saveImageResource(elem, groupUin > 0); err != nil {
 				s.logger.Warning("save image err: %v", err)
 			}
 		case *LgrMessage.ShortVideoElement:
@@ -24,23 +24,31 @@ func (s *Service) parseResources(elements []LgrMessage.IMessageElement, groupUin
 	}
 }
 
-func (s *Service) saveImageResource(elem *LgrMessage.ImageElement) error {
+func (s *Service) saveImageResource(elem *LgrMessage.ImageElement, isGroup bool) error {
 	var (
 		imageElem *LgrMessage.ImageElement
 		err       error
+		url       string
 	)
 
-	if elem.IsGroup {
-		imageElem, err = s.qqClient.QueryGroupImage(elem.Md5, elem.FileUUID)
+	if elem.URL != "" {
+		url = elem.URL
 	} else {
-		imageElem, err = s.qqClient.QueryFriendImage(elem.Md5, elem.FileUUID)
+		if isGroup {
+			imageElem, err = s.qqClient.QueryGroupImage(elem.Md5, elem.FileUUID)
+		} else {
+			imageElem, err = s.qqClient.QueryFriendImage(elem.Md5, elem.FileUUID)
+		}
+		if err == nil {
+			url = imageElem.URL
+		}
 	}
 
 	if err != nil {
 		return err
 	}
 
-	return s.bot.SaveResource(fmt.Sprintf("%x", elem.Md5), imageElem.URL)
+	return s.bot.SaveResource(fmt.Sprintf("%x", elem.Md5), url)
 }
 
 func (s *Service) saveVoiceResource(elem *LgrMessage.VoiceElement, groupUin uint32) error {
