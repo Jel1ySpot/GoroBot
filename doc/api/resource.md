@@ -15,4 +15,3 @@
 
 ### grb.GetResource(resourceID string) ([]byte, error)
 获取 ID 所指向的资源信息
-
