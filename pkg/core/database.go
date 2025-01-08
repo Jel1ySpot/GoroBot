@@ -8,6 +8,7 @@ import (
 func (i *Instant) OpenDatabase(driverName string, dataSourceName string) error {
 	var err error
 	if i.db, err = sql.Open(driverName, dataSourceName); err != nil {
+		i.db = nil
 		return fmt.Errorf("failed to connect to database: %v", err)
 	}
 	return nil
