@@ -1,2 +1,4 @@
 [book]
 title = "GoroBot 文档"
+author = ["GoroBot Team"]
+src = "doc"
