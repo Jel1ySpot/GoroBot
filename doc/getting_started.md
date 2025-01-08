@@ -61,7 +61,7 @@ grb.Use(LgrClient.Create())
 插件使用 `Create()` 创建一个服务，我们可以使用 `grb.Use(*Service)` 来使用一个服务。运行这段代码，如无意外还需要填写配置文件，详细请见 [pkg/lagrange](https://github.com/Jel1ySpot/GoroBot/tree/master/pkg/lagrange)。
 配置好服务后再次运行，没有意外的话机器人服务就启动成功了。
 
-# 使用插件
+## 使用插件
 同样是一个例子：
 ```go
 import "github.com/Jel1ySpot/GoroBot/example_plugin/message_logger" // 引入模块
