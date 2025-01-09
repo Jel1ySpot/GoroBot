@@ -2,3 +2,10 @@
 title = "GoroBot 文档"
 author = ["GoroBot Team"]
 src = "doc"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/Jel1ySpot/GoroBot"
+git-repository-icon = "fa-github"
+site-url = "/GoroBot/"
