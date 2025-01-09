@@ -51,7 +51,7 @@ func main() {
 填写完成后再次启动，可以发现报错消失了，但控制台没有输出。这是因为这段代码没有载入任何逻辑代码。在这段代码中，我们创建了一个 GoroBot 实例（为了方便，在文档中会用 grb 代表 GoroBot 实例），并通过 `grb.Run()` 运行了它。
 
 ## 引入适配器
-GoroBot 框架使用适配器支持各种 IM 平台。具体支持列表见 [**支持平台**](README.md#支持平台)。适配器也是一种插件。让我们尝试引入一个适配器：
+GoroBot 框架使用适配器支持各种 IM 平台。具体支持列表见 [**支持平台**](index.md#支持平台)。适配器也是一种插件。让我们尝试引入一个适配器：
 ```go
 import LgrClient "github.com/Jel1ySpot/GoroBot/pkg/lagrange" // 引入模块
 
@@ -73,4 +73,4 @@ grb.Use(message_logger.Create())
 
 ## 接下来应该做什么
 - [插件列表](plugins_list.md)
-- [api 文档](api/README.md)
+- [api 文档](api)
