@@ -14,7 +14,7 @@
 
 # APIS
 
-- [目录](api)
+- [目录](api/)
   - [GoroBot.Instant]()
   - [GoroBot.Resource](api/resource.md)
   - [GoroBot.Database](api/database.md)
