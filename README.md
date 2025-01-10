@@ -5,6 +5,8 @@ Go语言编写的跨平台聊天机器人框架
 
 ## 支持平台
 - [x] QQ ([pkg/lagrange](https://github.com/Jel1ySpot/GoroBot/tree/master/pkg/lagrange))
+- [ ] OneBot
+- [ ] QQ Official
 - [ ] Telegram
 
 ## 特性
