@@ -57,12 +57,58 @@ func (s *Service) FromMessageElements(elements []LgrMessage.IMessageElement, msg
 				source.Marshall(),
 			)
 		case *LgrMessage.VoiceElement:
+			var (
+				url string
+				err error
+			)
+			switch msgEvent := msgEvent.(type) {
+			case *LgrMessage.GroupMessage:
+				url, err = s.qqClient.GetGroupRecordURL(msgEvent.GroupUin, elem.Node)
+				if err == nil {
+					err = s.bot.SaveResource(fmt.Sprintf("%x", elem.Md5), url)
+				}
+			case *LgrMessage.PrivateMessage:
+				url, err = s.qqClient.GetPrivateRecordURL(elem.Node)
+				if err == nil {
+					err = s.bot.SaveResource(fmt.Sprintf("%x", elem.Md5), url)
+				}
+			}
+			if err != nil {
+				s.logger.Warning("save voice err: %v", err)
+			}
+
 			b.Append(
 				message.Voice,
 				"[录音]",
 				fmt.Sprintf("%x", elem.Md5),
 			)
 		case *LgrMessage.ImageElement:
+			var (
+				imageElem *LgrMessage.ImageElement
+				err       error
+				url       string
+			)
+
+			if elem.URL != "" {
+				url = elem.URL
+			} else {
+				if CheckMessageType(msgEvent) == message.GroupMessage {
+					imageElem, err = s.qqClient.QueryGroupImage(elem.Md5, elem.FileUUID)
+				} else {
+					imageElem, err = s.qqClient.QueryFriendImage(elem.Md5, elem.FileUUID)
+				}
+				if err == nil {
+					url = imageElem.URL
+				}
+			}
+
+			if err == nil {
+				err = s.bot.SaveResource(fmt.Sprintf("%x", elem.Md5), url)
+			}
+			if err != nil {
+				s.logger.Warning("save image err: %v", err)
+			}
+
 			b.Append(
 				message.Image,
 				"[照片]",
@@ -82,6 +128,13 @@ func (s *Service) FromMessageElements(elements []LgrMessage.IMessageElement, msg
 				}(),
 			)
 		case *LgrMessage.ShortVideoElement:
+			url, err := s.qqClient.GetVideoURL(CheckMessageType(msgEvent) == message.GroupMessage, elem.UUID)
+			if err == nil {
+				err = s.bot.SaveResource(fmt.Sprintf("%x", elem.Md5), url)
+			}
+			if err != nil {
+				s.logger.Warning("save short video err: %v", err)
+			}
 			b.Append(message.Video,
 				"[视频]",
 				fmt.Sprintf("%x", elem.Md5),
@@ -91,137 +144,43 @@ func (s *Service) FromMessageElements(elements []LgrMessage.IMessageElement, msg
 	return b.Build()
 }
 
-func FromBaseMessage(msg []*message.Element) []LgrMessage.IMessageElement {
-	b := messageBuilder{}
+func (s *Service) FromBaseMessage(msg []*message.Element) []LgrMessage.IMessageElement {
+	b := MessageBuilder{}
 	for _, elem := range msg {
 		switch elem.Type {
 		case message.Text:
-			b.text(elem.Content)
+			b.Text(elem.Content)
 		case message.Quote:
-			b.reply(elem.Source)
+			targetMessage, err := message.UnmarshallMessage(elem.Source)
+			if err != nil {
+				continue
+			}
+			b.Quote(targetMessage)
 		case message.Mention:
-			b.mention(elem.Source)
+			b.Mention(elem.Source)
 		case message.Image:
-			b.image(elem.Source)
+			if resource, err := s.bot.GetResource(elem.Source); err == nil {
+				b.ImageFromFile(resource.FilePath)
+			}
 		case message.Video:
-			b.video(elem.Source)
+			if resource, err := s.bot.GetResource(elem.Source); err == nil {
+				b.VideoFromFile(resource.FilePath)
+			}
 		case message.File:
-			b.file(elem.Source, elem.Content)
+			if resource, err := s.bot.GetResource(elem.Source); err == nil {
+				b.File(resource.FilePath, elem.Content)
+			}
 		case message.Voice:
-			b.voice(elem.Source)
+			if resource, err := s.bot.GetResource(elem.Source); err == nil {
+				b.Voice(resource.FilePath)
+			}
 		case message.Sticker:
-			b.sticker(elem.Source)
+			b.Sticker(elem.Source)
 		case message.Link:
-			b.text(elem.Source)
+			b.Text(elem.Source)
 		case message.Other:
-			b.text(elem.Content)
+			b.Text(elem.Content)
 		}
 	}
 	return b.Build()
-}
-
-type messageBuilder struct {
-	elements []LgrMessage.IMessageElement
-}
-
-func (b *messageBuilder) Build() []LgrMessage.IMessageElement {
-	return b.elements
-}
-
-func (b *messageBuilder) reply(source string) *messageBuilder {
-	msg, err := message.UnmarshallMessage(source)
-	if err != nil {
-		return b
-	}
-	id, err := strconv.ParseUint(msg.ID, 10, 32)
-	if err != nil {
-		return b
-	}
-	sender, err := strconv.ParseUint(msg.Sender.ID, 10, 32)
-	if err != nil {
-		return b
-	}
-	switch msg.MessageType {
-	case message.DirectMessage:
-		b.elements = append(b.elements, LgrMessage.NewPrivateReply(&LgrMessage.PrivateMessage{
-			ID:   uint32(id),
-			Time: uint32(msg.Time.Unix()),
-			Sender: &LgrMessage.Sender{
-				Uin: uint32(sender),
-			},
-			Elements: FromBaseMessage(msg.Elements),
-		}))
-	case message.GroupMessage:
-		b.elements = append(b.elements, LgrMessage.NewGroupReply(&LgrMessage.GroupMessage{
-			ID:   uint32(id),
-			Time: uint32(msg.Time.Unix()),
-			Sender: &LgrMessage.Sender{
-				Uin: uint32(sender),
-			},
-			Elements: FromBaseMessage(msg.Elements),
-		}))
-	}
-	return b
-}
-
-func (b *messageBuilder) text(text string) *messageBuilder {
-	length := len(b.elements)
-	if length > 0 && b.elements[length-1].Type() == LgrMessage.Text {
-		b.elements[length-1].(*LgrMessage.TextElement).Content += text
-	} else {
-		b.elements = append(b.elements, LgrMessage.NewText(text))
-	}
-	return b
-}
-
-func (b *messageBuilder) image(path string) *messageBuilder {
-	elem, err := LgrMessage.NewFileImage(path)
-	if err == nil {
-		b.elements = append(b.elements, elem)
-	}
-	return b
-}
-
-func (b *messageBuilder) mention(strUin string) *messageBuilder {
-	uin, err := strconv.ParseUint(strUin, 10, 64)
-	if err != nil {
-		return b
-	}
-	b.elements = append(b.elements, LgrMessage.NewAt(uint32(uin)))
-	return b
-}
-
-func (b *messageBuilder) video(path string) *messageBuilder {
-	elem, err := LgrMessage.NewFileVideo(path, nil)
-	if err == nil {
-		b.elements = append(b.elements, elem)
-	}
-	return b
-}
-
-func (b *messageBuilder) file(path string, name ...string) *messageBuilder {
-	if len(name) > 0 && name[0] == "" {
-		name = nil
-	}
-	elem, err := LgrMessage.NewLocalFile(path, name...)
-	if err == nil {
-		b.elements = append(b.elements, elem)
-	}
-	return b
-}
-
-func (b *messageBuilder) voice(path string) *messageBuilder {
-	elem, err := LgrMessage.NewFileRecord(path)
-	if err == nil {
-		b.elements = append(b.elements, elem)
-	}
-	return b
-}
-
-func (b *messageBuilder) sticker(sid string) *messageBuilder {
-	id, err := strconv.ParseUint(sid, 10, 16)
-	if err == nil {
-		b.elements = append(b.elements, LgrMessage.NewFace(uint16(id)))
-	}
-	return b
 }

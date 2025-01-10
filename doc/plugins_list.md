@@ -16,4 +16,4 @@
 ### 消息日志
 >`import "github.com/Jel1ySpot/GoroBot/example_plugin/message_logger"`
 
-将消息预览打印到日志。
+基础的消息事件监听。将消息预览打印到日志。

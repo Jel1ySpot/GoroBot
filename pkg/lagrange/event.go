@@ -16,11 +16,11 @@ func (s *Service) eventSubscribe() error {
 	})
 
 	qqClient.GroupMessageEvent.Subscribe(func(client *client.QQClient, event *LgrMessage.GroupMessage) {
-		s.messageEventHandler(event)
+		go s.messageEventHandler(event)
 	})
 
 	qqClient.PrivateMessageEvent.Subscribe(func(client *client.QQClient, event *LgrMessage.PrivateMessage) {
-		s.messageEventHandler(event)
+		go s.messageEventHandler(event)
 	})
 
 	return nil
@@ -28,7 +28,6 @@ func (s *Service) eventSubscribe() error {
 
 func (s *Service) messageEventHandler(event any) {
 	msg := NewMessageContext(event, s)
-	go s.parseResources(msg.OriginalElements(), msg.GroupUin())
 	if strings.HasPrefix(msg.String(), s.config.CommandPrefix) {
 		tokens, _ := shlex.Split(msg.String()[len(s.config.CommandPrefix):])
 		_ = s.bot.CommandEmit(

@@ -10,6 +10,7 @@ import (
 type MessageContext struct {
 	messageType message.Type
 	service     *Service
+	base        *message.Base
 	privateMsg  *LgrMessage.PrivateMessage
 	groupMsg    *LgrMessage.GroupMessage
 }
@@ -47,27 +48,30 @@ func (m *MessageContext) String() string {
 }
 
 func (m *MessageContext) Message() *message.Base {
-	switch m.messageType {
-	case message.DirectMessage:
-		return &message.Base{
-			MessageType: m.messageType,
-			ID:          strconv.FormatUint(uint64(m.privateMsg.ID), 10),
-			Content:     m.String(),
-			Elements:    m.service.FromMessageElements(m.privateMsg.Elements, m.privateMsg),
-			Sender:      SenderConv(m.Sender(), m.groupMsg),
-			Time:        time.Unix(int64(m.privateMsg.Time), 0),
-		}
-	case message.GroupMessage:
-		return &message.Base{
-			MessageType: m.messageType,
-			ID:          strconv.FormatUint(uint64(m.groupMsg.ID), 10),
-			Content:     m.String(),
-			Elements:    m.service.FromMessageElements(m.groupMsg.Elements, m.groupMsg),
-			Sender:      SenderConv(m.Sender(), m.groupMsg),
-			Time:        time.Unix(int64(m.groupMsg.Time), 0),
+	if m.base == nil {
+		switch m.messageType {
+		case message.DirectMessage:
+			m.base = &message.Base{
+				MessageType: m.messageType,
+				ID:          strconv.FormatUint(uint64(m.privateMsg.ID), 10),
+				Content:     m.String(),
+				Elements:    m.service.FromMessageElements(m.privateMsg.Elements, m.privateMsg),
+				Sender:      SenderConv(m.Sender(), m.groupMsg),
+				Time:        time.Unix(int64(m.privateMsg.Time), 0),
+			}
+		case message.GroupMessage:
+			m.base = &message.Base{
+				MessageType: m.messageType,
+				ID:          strconv.FormatUint(uint64(m.groupMsg.ID), 10),
+				Content:     m.String(),
+				Elements:    m.service.FromMessageElements(m.groupMsg.Elements, m.groupMsg),
+				Sender:      SenderConv(m.Sender(), m.groupMsg),
+				Time:        time.Unix(int64(m.groupMsg.Time), 0),
+			}
 		}
 	}
-	return nil
+
+	return m.base
 }
 
 func (m *MessageContext) OriginalElements() []LgrMessage.IMessageElement {
@@ -97,23 +101,26 @@ func (m *MessageContext) GroupUin() uint32 {
 	return 0
 }
 
-func (m *MessageContext) Reply(msg []*message.Element) error {
+func (m *MessageContext) reply(elements []LgrMessage.IMessageElement) error {
 	switch m.messageType {
 	case message.DirectMessage:
-		if _, err := m.service.qqClient.SendPrivateMessage(m.privateMsg.Sender.Uin, FromBaseMessage(msg)); err != nil {
+		if _, err := m.service.qqClient.SendPrivateMessage(m.privateMsg.Sender.Uin, elements); err != nil {
 			return err
 		}
 	case message.GroupMessage:
-		if _, err := m.service.qqClient.SendGroupMessage(m.groupMsg.GroupUin, FromBaseMessage(msg)); err != nil {
+		if _, err := m.service.qqClient.SendGroupMessage(m.groupMsg.GroupUin, elements); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
+func (m *MessageContext) Reply(msg []*message.Element) error {
+	return m.reply(m.service.FromBaseMessage(msg))
+}
+
 func (m *MessageContext) ReplyText(text string) error {
-	return m.Reply([]*message.Element{{
-		Type:    message.Text,
-		Content: text,
-	}})
+	return m.reply([]LgrMessage.IMessageElement{
+		LgrMessage.NewText(text),
+	})
 }

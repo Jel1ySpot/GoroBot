@@ -30,13 +30,19 @@ func (ctx *Context) Status() GoroBot.LoginStatus {
 	return ctx.service.status
 }
 
+func (ctx *Context) NewMessageBuilder() GoroBot.MessageBuilder {
+	return &MessageBuilder{
+		service: ctx.service,
+	}
+}
+
 func (ctx *Context) SendDirectMessage(target entity.User, elements []*message.Element) error {
 	uin, err := strconv.ParseUint(target.ID, 10, 32)
 	if err != nil {
 		return err
 	}
 
-	elems := FromBaseMessage(elements)
+	elems := ctx.service.FromBaseMessage(elements)
 
 	if _, err := ctx.service.qqClient.SendPrivateMessage(uint32(uin), elems); err != nil {
 		return err
@@ -50,7 +56,7 @@ func (ctx *Context) SendGroupMessage(target entity.Group, elements []*message.El
 		return err
 	}
 
-	elems := FromBaseMessage(elements)
+	elems := ctx.service.FromBaseMessage(elements)
 
 	if _, err := ctx.service.qqClient.SendGroupMessage(uint32(uin), elems); err != nil {
 		return err

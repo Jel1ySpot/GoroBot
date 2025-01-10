@@ -10,10 +10,11 @@ type BotContext interface {
 	Name() string
 	Protocol() string
 	Status() LoginStatus
-	Contacts() []entity.User
-	Groups() []entity.Group
+	NewMessageBuilder() MessageBuilder
 	SendDirectMessage(target entity.User, message []*message.Element) error
 	SendGroupMessage(target entity.Group, message []*message.Element) error
+	Contacts() []entity.User
+	Groups() []entity.Group
 	GetMessageFileUrl(msg *message.Base) (string, error)
 }
 

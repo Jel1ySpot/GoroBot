@@ -1,7 +1,6 @@
 package event
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -27,7 +26,7 @@ func (sys *System) Unregister(event string) {
 
 func (sys *System) On(event string, callback Callback) (func(), error) {
 	if _, ok := sys.events[event]; !ok {
-		return nil, errors.New("event not found")
+		return nil, fmt.Errorf("event not found")
 	}
 	handler, err := sys.events[event].append(callback)
 	if err != nil {

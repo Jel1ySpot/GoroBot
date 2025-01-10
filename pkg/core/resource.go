@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"time"
 )
 
@@ -21,7 +22,7 @@ type Resource struct {
 // SaveResource 保存资源文件，并更新资源索引
 func (i *Instant) SaveResource(resourceID string, resourceURL string) error {
 	if resourceID == "" || resourceURL == "" {
-		return errors.New("resourceID or resourceURL is empty")
+		return fmt.Errorf("resourceID or resourceURL is empty")
 	}
 
 	if i.ResourceExists(resourceID) {
@@ -167,7 +168,10 @@ func downloadFile(filePath string, url string) (string, error) {
 	// 获取文件扩展名
 	ext, err := mime.ExtensionsByType(resp.Header.Get("Content-Type"))
 	if err != nil {
-		return "", err
+		nameParse := strings.Split(resp.Header.Get("Content-Disposition"), ".")
+		ext = []string{
+			nameParse[len(nameParse)-1],
+		}
 	}
 	filePath += ext[0]
 
