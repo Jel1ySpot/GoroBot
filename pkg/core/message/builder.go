@@ -1,7 +1,23 @@
 package message
 
+import (
+	"fmt"
+)
+
 type Builder struct {
 	elements []*Element
+}
+
+func (b *Builder) Text(text string) *Builder {
+	return b.Append(Text, text, "")
+}
+
+func (b *Builder) Quote(msg *Base) *Builder {
+	return b.Append(Quote, "[回复]", msg.Marshall())
+}
+
+func (b *Builder) Mention(id string) *Builder {
+	return b.Append(Mention, fmt.Sprintf("@%s", id), id)
 }
 
 func NewBuilder() *Builder {
