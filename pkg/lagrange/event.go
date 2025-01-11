@@ -4,7 +4,6 @@ import (
 	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
 	"github.com/LagrangeDev/LagrangeGo/client"
 	LgrMessage "github.com/LagrangeDev/LagrangeGo/message"
-	"github.com/google/shlex"
 	"strings"
 )
 
@@ -29,17 +28,14 @@ func (s *Service) eventSubscribe() error {
 func (s *Service) messageEventHandler(event any) {
 	msg := NewMessageContext(event, s)
 	if strings.HasPrefix(msg.String(), s.config.CommandPrefix) {
-		tokens, _ := shlex.Split(msg.String()[len(s.config.CommandPrefix):])
-		_ = s.bot.CommandEmit(
-			&Context{service: s},
-			&command.Context{
-				Context: msg,
-				Tokens:  tokens,
-			},
+		text := msg.String()[len(s.config.CommandPrefix):]
+		s.bot.CommandEmit(
+			s.getContext(),
+			command.NewCommandContext(msg, text),
 		)
 	} else {
 		_ = s.bot.MessageEmit(
-			&Context{service: s},
+			s.getContext(),
 			msg,
 		)
 	}

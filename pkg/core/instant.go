@@ -3,6 +3,7 @@ package GoroBot
 import (
 	"database/sql"
 	"fmt"
+	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/event"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/logger"
 	"github.com/Jel1ySpot/GoroBot/pkg/util"
@@ -25,6 +26,7 @@ type Instant struct {
 
 	event      *event.System
 	middleware *MiddlewareSystem
+	commands   *command.System
 
 	// 没有连接数据库时使用
 	resourceMap map[string]Resource
@@ -41,6 +43,7 @@ func Create() *Instant {
 		middleware: &MiddlewareSystem{
 			middlewares: make(map[string]MiddlewareCallback),
 		},
+		commands: command.NewCommandSystem(),
 		config: Config{
 			Owner:    make(map[string]string),
 			LogLevel: logger.Info,

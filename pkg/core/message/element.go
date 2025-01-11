@@ -9,14 +9,14 @@ type Element struct {
 type ElementType int
 
 const (
-	Text ElementType = iota
-	Quote
-	Mention
-	Image
-	Video
-	File
-	Voice
-	Sticker
-	Link
-	Other
+	TextElement ElementType = iota
+	QuoteElement
+	MentionElement
+	ImageElement
+	VideoElement
+	FileElement
+	VoiceElement
+	StickerElement
+	LinkElement
+	OtherElement
 )

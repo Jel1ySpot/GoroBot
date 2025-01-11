@@ -67,11 +67,11 @@ func (ctx *Context) SendGroupMessage(target entity.Group, elements []*message.El
 func (ctx *Context) GetMessageFileUrl(msg *message.Base) (string, error) {
 	var elem *message.Element
 	for _, elem = range msg.Elements {
-		if elem.Type == message.File {
+		if elem.Type == message.FileElement {
 			break
 		}
 	}
-	if elem == nil || elem.Type != message.File {
+	if elem == nil || elem.Type != message.FileElement {
 		return "", fmt.Errorf("file element not exist")
 	}
 

@@ -28,7 +28,8 @@ func (i *Instant) EventEmit(eventName string, args ...interface{}) error {
 		return i.MessageEmit(args[0].(BotContext), args[1].(message.Context))
 	}
 	if eventName == "command" {
-		return i.CommandEmit(args[0].(BotContext), args[1].(*command.Context))
+		i.CommandEmit(args[0].(BotContext), args[1].(*command.Context))
+		return nil
 	}
 	return i.event.Emit(eventName, args...)
 }
@@ -36,14 +37,21 @@ func (i *Instant) EventEmit(eventName string, args ...interface{}) error {
 func (i *Instant) MessageEmit(ctx BotContext, msg message.Context) error {
 	// 中间件
 	return i.middleware.dispatch(ctx, msg, func() error {
+		for _, cmdReg := range i.commands.Commands {
+			cmdReg.CheckAlias(ctx, &command.Context{
+				Context: msg,
+			})
+		}
 		return i.event.Emit("message", ctx, msg)
 	})
 }
 
-func (i *Instant) CommandEmit(ctx BotContext, cmd *command.Context) error {
+func (i *Instant) CommandEmit(ctx BotContext, cmd *command.Context) {
 	// 中间件
-	return i.middleware.dispatch(ctx, cmd, func() error {
-		return i.event.Emit("command", ctx, cmd)
+	_ = i.middleware.dispatch(ctx, cmd, func() error {
+		i.event.Emit("message", ctx, cmd.Context)
+		i.commands.Emit(ctx, cmd)
+		return nil
 	})
 }
 

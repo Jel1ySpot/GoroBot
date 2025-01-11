@@ -38,6 +38,10 @@ func Create() *Service {
 	}
 }
 
+func (s *Service) getContext() *Context {
+	return &Context{s}
+}
+
 func (s *Service) Init(grb *GoroBot.Instant) error {
 	// https://blog.csdn.net/weixin_45760685/article/details/140629746
 	os.Setenv("GODEBUG", "tlsrsakex=1")
@@ -62,7 +66,7 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 
 	s.status = GoroBot.Online
 
-	grb.AddContext(&Context{s})
+	grb.AddContext(s.getContext())
 
 	return nil
 }

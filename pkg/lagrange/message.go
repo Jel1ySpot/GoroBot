@@ -13,16 +13,16 @@ func (s *Service) FromMessageElements(elements []LgrMessage.IMessageElement, msg
 	for _, elem := range elements {
 		switch elem := elem.(type) {
 		case *LgrMessage.TextElement:
-			b.Append(message.Text, elem.Content, "")
+			b.Append(message.TextElement, elem.Content, "")
 		case *LgrMessage.AtElement:
 			b.Append(
-				message.Mention,
+				message.MentionElement,
 				elem.Display,
 				strconv.FormatUint(uint64(elem.TargetUin), 10),
 			)
 		case *LgrMessage.FaceElement:
 			b.Append(
-				message.Sticker,
+				message.StickerElement,
 				"[表情]",
 				strconv.FormatUint(uint64(elem.FaceID), 10),
 			)
@@ -52,7 +52,7 @@ func (s *Service) FromMessageElements(elements []LgrMessage.IMessageElement, msg
 				},
 			}
 			b.Append(
-				message.Quote,
+				message.QuoteElement,
 				"[回复]",
 				source.Marshall(),
 			)
@@ -78,7 +78,7 @@ func (s *Service) FromMessageElements(elements []LgrMessage.IMessageElement, msg
 			}
 
 			b.Append(
-				message.Voice,
+				message.VoiceElement,
 				"[录音]",
 				fmt.Sprintf("%x", elem.Md5),
 			)
@@ -110,12 +110,12 @@ func (s *Service) FromMessageElements(elements []LgrMessage.IMessageElement, msg
 			}
 
 			b.Append(
-				message.Image,
+				message.ImageElement,
 				"[照片]",
 				fmt.Sprintf("%x", elem.Md5),
 			)
 		case *LgrMessage.FileElement:
-			b.Append(message.File,
+			b.Append(message.FileElement,
 				"[文件]",
 				func() string {
 					switch e := msgEvent.(type) {
@@ -135,7 +135,7 @@ func (s *Service) FromMessageElements(elements []LgrMessage.IMessageElement, msg
 			if err != nil {
 				s.logger.Warning("save short video err: %v", err)
 			}
-			b.Append(message.Video,
+			b.Append(message.VideoElement,
 				"[视频]",
 				fmt.Sprintf("%x", elem.Md5),
 			)
@@ -148,37 +148,37 @@ func (s *Service) FromBaseMessage(msg []*message.Element) []LgrMessage.IMessageE
 	b := MessageBuilder{}
 	for _, elem := range msg {
 		switch elem.Type {
-		case message.Text:
+		case message.TextElement:
 			b.Text(elem.Content)
-		case message.Quote:
+		case message.QuoteElement:
 			targetMessage, err := message.UnmarshallMessage(elem.Source)
 			if err != nil {
 				continue
 			}
 			b.Quote(targetMessage)
-		case message.Mention:
+		case message.MentionElement:
 			b.Mention(elem.Source)
-		case message.Image:
+		case message.ImageElement:
 			if resource, err := s.bot.GetResource(elem.Source); err == nil {
 				b.ImageFromFile(resource.FilePath)
 			}
-		case message.Video:
+		case message.VideoElement:
 			if resource, err := s.bot.GetResource(elem.Source); err == nil {
 				b.VideoFromFile(resource.FilePath)
 			}
-		case message.File:
+		case message.FileElement:
 			if resource, err := s.bot.GetResource(elem.Source); err == nil {
 				b.File(resource.FilePath, elem.Content)
 			}
-		case message.Voice:
+		case message.VoiceElement:
 			if resource, err := s.bot.GetResource(elem.Source); err == nil {
 				b.Voice(resource.FilePath)
 			}
-		case message.Sticker:
+		case message.StickerElement:
 			b.Sticker(elem.Source)
-		case message.Link:
+		case message.LinkElement:
 			b.Text(elem.Source)
-		case message.Other:
+		case message.OtherElement:
 			b.Text(elem.Content)
 		}
 	}

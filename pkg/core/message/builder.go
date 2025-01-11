@@ -9,15 +9,15 @@ type Builder struct {
 }
 
 func (b *Builder) Text(text string) *Builder {
-	return b.Append(Text, text, "")
+	return b.Append(TextElement, text, "")
 }
 
 func (b *Builder) Quote(msg *Base) *Builder {
-	return b.Append(Quote, "[回复]", msg.Marshall())
+	return b.Append(QuoteElement, "[回复]", msg.Marshall())
 }
 
 func (b *Builder) Mention(id string) *Builder {
-	return b.Append(Mention, fmt.Sprintf("@%s", id), id)
+	return b.Append(MentionElement, fmt.Sprintf("@%s", id), id)
 }
 
 func NewBuilder() *Builder {
