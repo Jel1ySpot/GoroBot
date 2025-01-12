@@ -37,11 +37,11 @@ func (i *Instant) EventEmit(eventName string, args ...interface{}) error {
 func (i *Instant) MessageEmit(ctx BotContext, msg message.Context) error {
 	// 中间件
 	return i.middleware.dispatch(ctx, msg, func() error {
-		for _, cmdReg := range i.commands.Commands {
-			cmdReg.CheckAlias(ctx, &command.Context{
-				Context: msg,
-			})
-		}
+		go func() {
+			for _, cmdReg := range i.commands.Commands {
+				cmdReg.CheckAlias(ctx, command.NewCommandContext(msg, msg.String()))
+			}
+		}()
 		return i.event.Emit("message", ctx, msg)
 	})
 }
@@ -49,8 +49,8 @@ func (i *Instant) MessageEmit(ctx BotContext, msg message.Context) error {
 func (i *Instant) CommandEmit(ctx BotContext, cmd *command.Context) {
 	// 中间件
 	_ = i.middleware.dispatch(ctx, cmd, func() error {
-		i.event.Emit("message", ctx, cmd.Context)
-		i.commands.Emit(ctx, cmd)
+		go i.event.Emit("message", ctx, cmd.Context)
+		go i.commands.Emit(ctx, cmd)
 		return nil
 	})
 }

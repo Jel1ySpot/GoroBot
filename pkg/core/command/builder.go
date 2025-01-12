@@ -8,7 +8,7 @@ import (
 var (
 	RegFormat         = regexp.MustCompile(`^(?P<name>\w+?)(?P<args>(?: [<\[]\w+?(?::\w+?)?[>\]](?:=\w+?)? ?)*)$`)
 	ArgumentRegFormat = regexp.MustCompile(`(?:<(?P<required_name>\w+?)(?::(?P<required_type>\w+?))?>|\[(?P<optional_name>\w+?)(?::(?P<optional_type>\w+?))?\])(?:=(?P<default>\w+))?`)
-	OptionRegFormat   = regexp.MustCompile(`^-(?P<short>\w+?) \[(?P<name>\w+?):(?P<type>\w+?)\](?:=(?P<default>\w+?))?$`)
+	OptionRegFormat   = regexp.MustCompile(`^-(?P<short>\w+?) \[(?P<name>\w+?)(?::(?P<type>\w+?))?\](?:=(?P<default>\w+?))?$`)
 )
 
 type FormatBuilder struct {

@@ -81,7 +81,7 @@ func (r *Registry) CheckAlias(botCtx interface{}, cmdCtx *Context) { // 在消�
 			cmdCtx.Command = r.format.Name
 			matches := reg.FindStringSubmatch(cmdCtx.ArgumentString) // 正则中的子串
 			for _, arg := range r.format.Arguments {                 // 遍历参数
-				if val, ok := cmdCtx.Options[arg.Name]; ok {
+				if val, ok := opts[arg.Name]; ok {
 					if strings.HasPrefix(val, "$") { // 如果格式为 "$SubExpName"
 						if i := reg.SubexpIndex(val[1:]); i != -1 { // 如果子串存在
 							cmdCtx.Options[arg.Name] = matches[i]

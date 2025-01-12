@@ -1,7 +1,6 @@
 package ping
 
 import (
-	"fmt"
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/message"
@@ -31,9 +30,9 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 		return nil
 	}))
 
-	cmdFn, err := grb.Command("ping [someArg]=default", func(ctx GoroBot.BotContext, cmd *command.Context) {
-		_ = cmd.ReplyText(fmt.Sprintf("🏓, Arguments: %#v, Options: %#v", cmd.Args, cmd.Options))
-	}).Option("-o [someText:text]=default").Build()
+	cmdFn, err := grb.Command("ping", func(ctx GoroBot.BotContext, cmd *command.Context) {
+		_ = cmd.ReplyText("🏓")
+	}).Build()
 	if err != nil {
 		return err
 	}
