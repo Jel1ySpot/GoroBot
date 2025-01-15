@@ -36,7 +36,6 @@ func (s *Service) login() error {
 		}
 	}
 
-	// TODO: 消息订阅
 	if err := s.eventSubscribe(); err != nil {
 		return err
 	}
@@ -45,6 +44,7 @@ func (s *Service) login() error {
 		s.logger.Info("try FastLogin")
 		if err := c.FastLogin(); err != nil {
 			s.logger.Warning("fastLogin fail: %s", err)
+			c.UseSig(auth.SigInfo{})
 		} else {
 			return nil
 		}
@@ -77,6 +77,8 @@ func (s *Service) login() error {
 		return err
 	}
 	s.logger.Info("login successed")
+
+	s.saveSig()
 
 	return nil
 }

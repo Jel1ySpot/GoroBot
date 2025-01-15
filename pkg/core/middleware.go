@@ -1,12 +1,12 @@
 package GoroBot
 
 import (
-	"github.com/Jel1ySpot/GoroBot/pkg/core/message"
+	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/google/uuid"
 	"sync"
 )
 
-type MiddlewareCallback func(bot BotContext, msg message.Context, next func(...MiddlewareCallback) error) error
+type MiddlewareCallback func(msg botc.MessageContext, next func(...MiddlewareCallback) error) error
 
 type MiddlewareSystem struct {
 	middlewares map[string]MiddlewareCallback
@@ -48,7 +48,7 @@ func (sys *MiddlewareSystem) add(callback MiddlewareCallback, prepare bool) func
 	}
 }
 
-func (sys *MiddlewareSystem) dispatch(bot BotContext, msg message.Context, fn func() error) error {
+func (sys *MiddlewareSystem) dispatch(msg botc.MessageContext, fn func() error) error {
 	sys.mu.Lock()
 	defer sys.mu.Unlock()
 
@@ -66,7 +66,7 @@ func (sys *MiddlewareSystem) dispatch(bot BotContext, msg message.Context, fn fu
 		}
 
 		index++
-		return final[index-1](bot, msg, finalCallback)
+		return final[index-1](msg, finalCallback)
 	}
 
 	var callback func(cb ...MiddlewareCallback) error
@@ -82,7 +82,7 @@ func (sys *MiddlewareSystem) dispatch(bot BotContext, msg message.Context, fn fu
 
 		if m, ok := sys.middlewares[sys.sortedIDs[index]]; ok {
 			index++
-			return m(bot, msg, callback)
+			return m(msg, callback)
 		} else {
 			sys.sortedIDs = append(sys.sortedIDs[:index], sys.sortedIDs[index+1:]...)
 			return callback()

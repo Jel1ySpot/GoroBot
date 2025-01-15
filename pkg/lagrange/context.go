@@ -2,12 +2,10 @@ package lagrange
 
 import (
 	"fmt"
-	"github.com/Jel1ySpot/GoroBot/pkg/core"
+	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/message"
 	lgrEntity "github.com/LagrangeDev/LagrangeGo/client/entity"
 	"strconv"
-	"strings"
 )
 
 type Context struct {
@@ -15,7 +13,7 @@ type Context struct {
 }
 
 func (ctx *Context) ID() string {
-	return strconv.FormatInt(int64(ctx.service.config.Account.Uin), 10)
+	return GenUserID(ctx.service.config.Account.Uin)
 }
 
 func (ctx *Context) Name() string {
@@ -26,75 +24,70 @@ func (ctx *Context) Protocol() string {
 	return "lagrange"
 }
 
-func (ctx *Context) Status() GoroBot.LoginStatus {
+func (ctx *Context) Status() botc.LoginStatus {
 	return ctx.service.status
 }
 
-func (ctx *Context) NewMessageBuilder() GoroBot.MessageBuilder {
+func (ctx *Context) NewMessageBuilder() botc.MessageBuilder {
 	return &MessageBuilder{
 		service: ctx.service,
 	}
 }
 
-func (ctx *Context) SendDirectMessage(target entity.User, elements []*message.Element) error {
-	uin, err := strconv.ParseUint(target.ID, 10, 32)
-	if err != nil {
-		return err
+func (ctx *Context) SendDirectMessage(target entity.User, elements []*botc.MessageElement) (*botc.BaseMessage, error) {
+	uin, ok := ParseUin(target.ID)
+	if !ok {
+		return nil, fmt.Errorf("invalid uin %s", target.ID)
 	}
 
 	elems := ctx.service.FromBaseMessage(elements)
 
-	if _, err := ctx.service.qqClient.SendPrivateMessage(uint32(uin), elems); err != nil {
-		return err
+	if msg, err := ctx.service.qqClient.SendPrivateMessage(uint32(uin), elems); err != nil {
+		return nil, err
+	} else {
+		return ctx.service.MessageEventToBase(msg)
 	}
-	return nil
 }
 
-func (ctx *Context) SendGroupMessage(target entity.Group, elements []*message.Element) error {
-	uin, err := strconv.ParseUint(target.ID, 10, 32)
-	if err != nil {
-		return err
+func (ctx *Context) SendGroupMessage(target entity.Group, elements []*botc.MessageElement) (*botc.BaseMessage, error) {
+	uin, ok := ParseUin(target.ID)
+	if !ok {
+		return nil, fmt.Errorf("invalid uin %s", target.ID)
 	}
 
 	elems := ctx.service.FromBaseMessage(elements)
 
-	if _, err := ctx.service.qqClient.SendGroupMessage(uint32(uin), elems); err != nil {
-		return err
+	if msg, err := ctx.service.qqClient.SendGroupMessage(uint32(uin), elems); err != nil {
+		return nil, err
+	} else {
+		return ctx.service.MessageEventToBase(msg)
 	}
-	return nil
 }
 
-func (ctx *Context) GetMessageFileUrl(msg *message.Base) (string, error) {
-	var elem *message.Element
+func (ctx *Context) GetMessageFileUrl(msg *botc.BaseMessage) (string, error) {
+	var elem *botc.MessageElement
 	for _, elem = range msg.Elements {
-		if elem.Type == message.FileElement {
+		if elem.Type == botc.FileElement {
 			break
 		}
 	}
-	if elem == nil || elem.Type != message.FileElement {
+	if elem == nil || elem.Type != botc.FileElement {
 		return "", fmt.Errorf("file element not exist")
 	}
 
-	var (
-		msgProtocol string
-		fileDetail  string
-	)
-	if n, err := fmt.Sscanf(elem.Source, "%s:%s", &msgProtocol, &fileDetail); err != nil || n != 2 {
-		return "", fmt.Errorf("invalid source format")
-	}
-	args := strings.Split(fileDetail, "&")
-	if msgProtocol != "lagrange" {
-		return "", fmt.Errorf("protocol not match")
+	info, ok := entity.ParseInfo(elem.Source)
+	if !ok || info.Protocol != "lagrange" {
+		return "", fmt.Errorf("invalid source")
 	}
 	switch msg.MessageType {
-	case message.DirectMessage:
-		return ctx.service.qqClient.GetPrivateFileURL(args[0], args[1])
-	case message.GroupMessage:
-		id, err := strconv.ParseUint(args[0], 10, 32)
+	case botc.DirectMessage:
+		return ctx.service.qqClient.GetPrivateFileURL(info.Args[0], info.Args[1])
+	case botc.GroupMessage:
+		id, err := strconv.ParseUint(info.Args[0], 10, 32)
 		if err != nil {
 			return "", fmt.Errorf("parse file detail error: %v", err)
 		}
-		return ctx.service.qqClient.GetGroupFileURL(uint32(id), args[1])
+		return ctx.service.qqClient.GetGroupFileURL(uint32(id), info.Args[1])
 	}
 	return "", nil
 }
@@ -110,7 +103,7 @@ func (ctx *Context) Contacts() []entity.User {
 	for uin, user := range data {
 		users = append(users, entity.User{
 			Base: &entity.Base{
-				ID:     strconv.FormatUint(uint64(uin), 10),
+				ID:     GenUserID(uin),
 				Name:   user.Nickname,
 				Avatar: user.Avatar,
 			},
@@ -138,7 +131,7 @@ func (ctx *Context) Groups() []entity.Group {
 	for uin, group := range data {
 		groups = append(groups, entity.Group{
 			Base: &entity.Base{
-				ID:     strconv.FormatUint(uint64(uin), 10),
+				ID:     GenGroupID(uin),
 				Name:   group.GroupName,
 				Avatar: group.Avatar(),
 			},
@@ -153,7 +146,7 @@ func (ctx *Context) Groups() []entity.Group {
 				for uin, member := range membersData[uin] {
 					members = append(members, &entity.User{
 						Base: &entity.Base{
-							ID:     strconv.FormatUint(uint64(uin), 10),
+							ID:     GenUserID(uin),
 							Name:   member.Nickname,
 							Avatar: member.Avatar,
 						},

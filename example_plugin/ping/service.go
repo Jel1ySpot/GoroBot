@@ -2,8 +2,8 @@ package ping
 
 import (
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
+	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/message"
 )
 
 type Service struct {
@@ -23,15 +23,15 @@ func Create() *Service {
 func (s *Service) Init(grb *GoroBot.Instant) error {
 	s.bot = grb
 
-	msgFn, _ := grb.On(GoroBot.MessageEvent(func(ctx GoroBot.BotContext, msg message.Context) error {
+	msgFn, _ := grb.On(GoroBot.MessageEvent(func(msg botc.MessageContext) error {
 		if msg.String() == "ping" {
-			_ = msg.ReplyText("🏓")
+			_, _ = msg.ReplyText("🏓")
 		}
 		return nil
 	}))
 
-	cmdFn, err := grb.Command("ping", func(ctx GoroBot.BotContext, cmd *command.Context) {
-		_ = cmd.ReplyText("🏓")
+	cmdFn, err := grb.Command("ping", func(cmd *command.Context) {
+		_, _ = cmd.ReplyText("🏓")
 	}).Build()
 	if err != nil {
 		return err

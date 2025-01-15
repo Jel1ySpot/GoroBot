@@ -30,12 +30,10 @@ func (s *Service) messageEventHandler(event any) {
 	if strings.HasPrefix(msg.String(), s.config.CommandPrefix) {
 		text := msg.String()[len(s.config.CommandPrefix):]
 		s.bot.CommandEmit(
-			s.getContext(),
 			command.NewCommandContext(msg, text),
 		)
 	} else {
 		_ = s.bot.MessageEmit(
-			s.getContext(),
 			msg,
 		)
 	}

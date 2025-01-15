@@ -1,11 +1,11 @@
 package command
 
 import (
-	"github.com/Jel1ySpot/GoroBot/pkg/core/message"
+	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 )
 
 type Context struct {
-	message.Context
+	botc.MessageContext
 	Tokens         []string
 	Command        string
 	ArgumentString string
@@ -13,9 +13,9 @@ type Context struct {
 	Options        map[string]string
 }
 
-func NewCommandContext(msg message.Context, text string) *Context {
+func NewCommandContext(msg botc.MessageContext, text string) *Context {
 	return &Context{
-		Context:        msg,
+		MessageContext: msg,
 		ArgumentString: text,
 		Args:           make(map[string]string),
 		Options:        make(map[string]string),

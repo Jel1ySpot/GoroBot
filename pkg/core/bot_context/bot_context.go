@@ -1,8 +1,7 @@
-package GoroBot
+package bot_context
 
 import (
 	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/message"
 )
 
 type BotContext interface {
@@ -11,11 +10,11 @@ type BotContext interface {
 	Protocol() string
 	Status() LoginStatus
 	NewMessageBuilder() MessageBuilder
-	SendDirectMessage(target entity.User, message []*message.Element) error
-	SendGroupMessage(target entity.Group, message []*message.Element) error
+	SendDirectMessage(target entity.User, elements []*MessageElement) (*BaseMessage, error)
+	SendGroupMessage(target entity.Group, elements []*MessageElement) (*BaseMessage, error)
 	Contacts() []entity.User
 	Groups() []entity.Group
-	GetMessageFileUrl(msg *message.Base) (string, error)
+	GetMessageFileUrl(msg *BaseMessage) (string, error)
 }
 
 type LoginStatus int

@@ -2,8 +2,7 @@ package lagrange
 
 import (
 	"fmt"
-	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/message"
+	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	LgrMessage "github.com/LagrangeDev/LagrangeGo/message"
 	"io"
 	"net/http"
@@ -23,31 +22,31 @@ func (b *MessageBuilder) Build() []LgrMessage.IMessageElement {
 	return b.elements
 }
 
-func (b *MessageBuilder) Quote(msg *message.Base) GoroBot.MessageBuilder {
-	id, err := strconv.ParseUint(msg.ID, 10, 32)
-	if err != nil {
+func (b *MessageBuilder) Quote(msg *botc.BaseMessage) botc.MessageBuilder {
+	id, ok := ParseUin(msg.ID)
+	if !ok {
 		return b
 	}
-	sender, err := strconv.ParseUint(msg.Sender.ID, 10, 32)
-	if err != nil {
+	sender, ok := ParseUin(msg.Sender.ID)
+	if !ok {
 		return b
 	}
 	switch msg.MessageType {
-	case message.DirectMessage:
+	case botc.DirectMessage:
 		b.elements = append(b.elements, LgrMessage.NewPrivateReply(&LgrMessage.PrivateMessage{
-			ID:   uint32(id),
+			ID:   id,
 			Time: uint32(msg.Time.Unix()),
 			Sender: &LgrMessage.Sender{
-				Uin: uint32(sender),
+				Uin: sender,
 			},
 			Elements: b.service.FromBaseMessage(msg.Elements),
 		}))
-	case message.GroupMessage:
+	case botc.GroupMessage:
 		b.elements = append(b.elements, LgrMessage.NewGroupReply(&LgrMessage.GroupMessage{
-			ID:   uint32(id),
+			ID:   id,
 			Time: uint32(msg.Time.Unix()),
 			Sender: &LgrMessage.Sender{
-				Uin: uint32(sender),
+				Uin: sender,
 			},
 			Elements: b.service.FromBaseMessage(msg.Elements),
 		}))
@@ -55,7 +54,7 @@ func (b *MessageBuilder) Quote(msg *message.Base) GoroBot.MessageBuilder {
 	return b
 }
 
-func (b *MessageBuilder) Text(text string) GoroBot.MessageBuilder {
+func (b *MessageBuilder) Text(text string) botc.MessageBuilder {
 	length := len(b.elements)
 	if length > 0 && b.elements[length-1].Type() == LgrMessage.Text {
 		b.elements[length-1].(*LgrMessage.TextElement).Content += text
@@ -65,7 +64,7 @@ func (b *MessageBuilder) Text(text string) GoroBot.MessageBuilder {
 	return b
 }
 
-func (b *MessageBuilder) ImageFromFile(path string) GoroBot.MessageBuilder {
+func (b *MessageBuilder) ImageFromFile(path string) botc.MessageBuilder {
 	elem, err := LgrMessage.NewFileImage(path)
 	if err == nil {
 		b.elements = append(b.elements, elem)
@@ -73,12 +72,12 @@ func (b *MessageBuilder) ImageFromFile(path string) GoroBot.MessageBuilder {
 	return b
 }
 
-func (b *MessageBuilder) ImageFromData(data []byte) GoroBot.MessageBuilder {
+func (b *MessageBuilder) ImageFromData(data []byte) botc.MessageBuilder {
 	b.elements = append(b.elements, LgrMessage.NewImage(data))
 	return b
 }
 
-func (b *MessageBuilder) ImageFromUrl(url string) GoroBot.MessageBuilder {
+func (b *MessageBuilder) ImageFromUrl(url string) botc.MessageBuilder {
 	// 发送HTTP GET请求下载文件
 	resp, err := http.Get(url)
 	if err != nil {
@@ -93,7 +92,7 @@ func (b *MessageBuilder) ImageFromUrl(url string) GoroBot.MessageBuilder {
 	return b
 }
 
-func (b *MessageBuilder) Mention(id string) GoroBot.MessageBuilder {
+func (b *MessageBuilder) Mention(id string) botc.MessageBuilder {
 	uin, err := strconv.ParseUint(id, 10, 64)
 	if err != nil {
 		return b
@@ -102,7 +101,7 @@ func (b *MessageBuilder) Mention(id string) GoroBot.MessageBuilder {
 	return b
 }
 
-func (b *MessageBuilder) VideoFromFile(path string) GoroBot.MessageBuilder {
+func (b *MessageBuilder) VideoFromFile(path string) botc.MessageBuilder {
 	elem, err := LgrMessage.NewFileVideo(path, nil)
 	if err == nil {
 		b.elements = append(b.elements, elem)
@@ -110,7 +109,7 @@ func (b *MessageBuilder) VideoFromFile(path string) GoroBot.MessageBuilder {
 	return b
 }
 
-func (b *MessageBuilder) File(path string, name ...string) GoroBot.MessageBuilder {
+func (b *MessageBuilder) File(path string, name ...string) botc.MessageBuilder {
 	if len(name) > 0 && name[0] == "" {
 		name = nil
 	}
@@ -121,7 +120,7 @@ func (b *MessageBuilder) File(path string, name ...string) GoroBot.MessageBuilde
 	return b
 }
 
-func (b *MessageBuilder) Voice(path string) GoroBot.MessageBuilder {
+func (b *MessageBuilder) Voice(path string) botc.MessageBuilder {
 	elem, err := LgrMessage.NewFileRecord(path)
 	if err == nil {
 		b.elements = append(b.elements, elem)
@@ -129,7 +128,7 @@ func (b *MessageBuilder) Voice(path string) GoroBot.MessageBuilder {
 	return b
 }
 
-func (b *MessageBuilder) Sticker(sid string) GoroBot.MessageBuilder {
+func (b *MessageBuilder) Sticker(sid string) botc.MessageBuilder {
 	id, err := strconv.ParseUint(sid, 10, 16)
 	if err == nil {
 		b.elements = append(b.elements, LgrMessage.NewFace(uint16(id)))
@@ -137,34 +136,34 @@ func (b *MessageBuilder) Sticker(sid string) GoroBot.MessageBuilder {
 	return b
 }
 
-func (b *MessageBuilder) ReplyTo(msg message.Context) error {
+func (b *MessageBuilder) ReplyTo(msg botc.MessageContext) (*botc.BaseMessage, error) {
 	if msg.Protocol() != "lagrange" {
-		return fmt.Errorf("expected protocol 'lagrange', got %s", msg.Protocol())
+		return nil, fmt.Errorf("expected protocol 'lagrange', got %s", msg.Protocol())
 	}
 	return msg.(*MessageContext).reply(b.elements)
 }
 
-func (b *MessageBuilder) Send(ctx GoroBot.BotContext, messageType message.Type, id string) error {
-	if ctx.Protocol() != "lagrange" {
-		return fmt.Errorf("expected protocol 'lagrange', got %s", ctx.Protocol())
-	}
-
+func (b *MessageBuilder) Send(messageType botc.MessageType, id string) (*botc.BaseMessage, error) {
 	uin, err := strconv.ParseUint(id, 10, 32)
 	if err != nil {
-		return fmt.Errorf("cannot convert id %s to uin", id)
+		return nil, fmt.Errorf("cannot convert id %s to uin", id)
 	}
 
-	client := ctx.(*Context).service.qqClient
+	client := b.service.qqClient
 
 	switch messageType {
-	case message.DirectMessage:
-		if _, err := client.SendPrivateMessage(uint32(uin), b.elements); err != nil {
-			return err
+	case botc.DirectMessage:
+		if event, err := client.SendPrivateMessage(uint32(uin), b.elements); err != nil {
+			return nil, err
+		} else {
+			return b.service.MessageEventToBase(event)
 		}
-	case message.GroupMessage:
-		if _, err := client.SendGroupMessage(uint32(uin), b.elements); err != nil {
-			return err
+	case botc.GroupMessage:
+		if event, err := client.SendGroupMessage(uint32(uin), b.elements); err != nil {
+			return nil, err
+		} else {
+			return b.service.MessageEventToBase(event)
 		}
 	}
-	return nil
+	return nil, fmt.Errorf("unhandled message type %d", messageType)
 }

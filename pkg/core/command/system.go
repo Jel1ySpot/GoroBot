@@ -52,29 +52,29 @@ func (s *System) Register(format Format, handler func(args ...interface{})) func
 	}
 }
 
-func (s *System) Emit(botCtx interface{}, cmdCtx *Context) {
+func (s *System) Emit(cmdCtx *Context) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, registry := range s.Commands {
-		registry.Emit(botCtx, cmdCtx)
+		registry.Emit(cmdCtx)
 	}
 }
 
-func (r *Registry) Emit(botCtx interface{}, cmdCtx *Context) {
+func (r *Registry) Emit(cmdCtx *Context) {
 	if err := r.parse(cmdCtx); err != nil {
 		if cmdCtx.Command == r.format.Name {
-			_ = cmdCtx.ReplyText(err.Error())
+			_, _ = cmdCtx.ReplyText(err.Error())
 		}
 		return
 	}
 	if err := r.checkRequired(cmdCtx); err != nil {
-		_ = cmdCtx.ReplyText(err.Error())
+		_, _ = cmdCtx.ReplyText(err.Error())
 		return
 	}
-	r.handler(botCtx, cmdCtx)
+	r.handler(cmdCtx)
 }
 
-func (r *Registry) CheckAlias(botCtx interface{}, cmdCtx *Context) { // 在消息事件触发时调用
+func (r *Registry) CheckAlias(cmdCtx *Context) { // 在消息事件触发时调用
 	for alias, opts := range r.format.Alias {
 		reg := regexp.MustCompile(alias)
 		if reg.MatchString(cmdCtx.ArgumentString) { // 如果匹配指令别名
@@ -106,7 +106,7 @@ func (r *Registry) CheckAlias(botCtx interface{}, cmdCtx *Context) { // 在消�
 					cmdCtx.Options[opt.Name] = opt.Default
 				}
 			}
-			r.handler(botCtx, cmdCtx)
+			r.handler(cmdCtx)
 			return
 		}
 	}

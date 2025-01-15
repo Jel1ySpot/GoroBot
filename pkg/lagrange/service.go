@@ -2,6 +2,7 @@ package lagrange
 
 import (
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
+	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/logger"
 	"github.com/Jel1ySpot/conic"
 	"github.com/LagrangeDev/LagrangeGo/client"
@@ -20,7 +21,7 @@ type Service struct {
 	qqClient   *client.QQClient
 	bot        *GoroBot.Instant
 	owner      uint32
-	status     GoroBot.LoginStatus
+	status     botc.LoginStatus
 
 	conic  *conic.Conic
 	logger logger.Inst
@@ -33,7 +34,7 @@ func (s *Service) Name() string {
 func Create() *Service {
 	return &Service{
 		conic:      conic.New(),
-		status:     GoroBot.Offline,
+		status:     botc.Offline,
 		ConfigPath: DefaultConfigPath,
 	}
 }
@@ -44,7 +45,7 @@ func (s *Service) getContext() *Context {
 
 func (s *Service) Init(grb *GoroBot.Instant) error {
 	// https://blog.csdn.net/weixin_45760685/article/details/140629746
-	os.Setenv("GODEBUG", "tlsrsakex=1")
+	_ = os.Setenv("GODEBUG", "tlsrsakex=1")
 
 	s.bot = grb
 	s.logger = grb.GetLogger()
@@ -58,13 +59,13 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 		return err
 	}
 
-	s.qqClient = client.NewClient(0, "")
+	s.qqClient = client.NewClientEmpty()
 
 	if err := s.login(); err != nil {
 		return err
 	}
 
-	s.status = GoroBot.Online
+	s.status = botc.Online
 
 	grb.AddContext(s.getContext())
 
@@ -84,19 +85,21 @@ func (s *Service) Release(grb *GoroBot.Instant) error {
 func (s *Service) releaseQQClient() error {
 	s.qqClient.Release()
 
-	func() {
-		data, err := s.qqClient.Sig().Marshal()
-		if err != nil {
-			s.logger.Error("marshal sig.bin err: %s", err)
-			return
-		}
-		err = os.WriteFile(path.Join(DefaultConfigPath, s.config.Account.SigPath), data, 0644)
-		if err != nil {
-			s.logger.Error("write sig.bin err: %s", err)
-			return
-		}
-		s.logger.Info("sig saved into %s", path.Join(DefaultConfigPath, s.config.Account.SigPath))
-	}()
+	s.saveSig()
 
 	return nil
+}
+
+func (s *Service) saveSig() {
+	data, err := s.qqClient.Sig().Marshal()
+	if err != nil {
+		s.logger.Error("marshal sig.bin err: %s", err)
+		return
+	}
+	err = os.WriteFile(path.Join(DefaultConfigPath, s.config.Account.SigPath), data, 0644)
+	if err != nil {
+		s.logger.Error("write sig.bin err: %s", err)
+		return
+	}
+	s.logger.Info("sig saved into %s", path.Join(DefaultConfigPath, s.config.Account.SigPath))
 }

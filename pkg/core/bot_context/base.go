@@ -1,4 +1,4 @@
-package message
+package bot_context
 
 import (
 	"encoding/json"
@@ -6,23 +6,23 @@ import (
 	"time"
 )
 
-type Type int
+type MessageType int
 
 const (
-	DirectMessage Type = iota
+	DirectMessage MessageType = iota
 	GroupMessage
 )
 
-type Base struct {
-	MessageType Type
+type BaseMessage struct {
+	MessageType MessageType
 	ID          string
 	Content     string
-	Elements    []*Element
+	Elements    []*MessageElement
 	Sender      *entity.Sender
 	Time        time.Time
 }
 
-func (m *Base) Marshall() string {
+func (m *BaseMessage) Marshall() string {
 	bytes, err := json.Marshal(m)
 	if err != nil {
 		return "{}"
@@ -30,8 +30,8 @@ func (m *Base) Marshall() string {
 	return string(bytes)
 }
 
-func UnmarshallMessage(str string) (*Base, error) {
-	msg := Base{}
+func UnmarshallMessage(str string) (*BaseMessage, error) {
+	msg := BaseMessage{}
 	if err := json.Unmarshal([]byte(str), &msg); err != nil {
 		return nil, err
 	}

@@ -2,8 +2,8 @@ package message_logger
 
 import (
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
+	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/logger"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/message"
 )
 
 type Service struct {
@@ -25,8 +25,8 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 	s.bot = grb
 	s.logger = grb.GetLogger()
 
-	s.releaseFunc, _ = grb.On(GoroBot.MessageEvent(func(ctx GoroBot.BotContext, msg message.Context) error {
-		s.log(msg)
+	s.releaseFunc, _ = grb.On(GoroBot.MessageEvent(func(ctx botc.MessageContext) error {
+		s.log(ctx)
 		return nil
 	}))
 
@@ -40,14 +40,14 @@ func (s *Service) Release(grb *GoroBot.Instant) error {
 	return nil
 }
 
-func (s *Service) log(ctx message.Context) {
+func (s *Service) log(ctx botc.MessageContext) {
 	log := s.logger
 	msg := ctx.Message()
 
 	switch msg.MessageType {
-	case message.GroupMessage:
+	case botc.GroupMessage:
 		log.Info("Message from [%s]: [%s]%s(%s): %s", ctx.Protocol(), msg.Sender.From, msg.Sender.Nickname, msg.Sender.ID, msg.Content)
-	case message.DirectMessage:
+	case botc.DirectMessage:
 		log.Info("Message from [%s]: %s(%s): %s", ctx.Protocol(), msg.Sender.Name, msg.Sender.ID, msg.Content)
 	}
 }

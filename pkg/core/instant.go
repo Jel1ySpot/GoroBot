@@ -3,6 +3,7 @@ package GoroBot
 import (
 	"database/sql"
 	"fmt"
+	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/event"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/logger"
@@ -21,7 +22,7 @@ type Instant struct {
 	services []Service
 	logger   logger.Inst
 	db       *sql.DB
-	contexts map[string]BotContext
+	contexts map[string]botc.BotContext
 	config   Config
 
 	event      *event.System
@@ -38,7 +39,7 @@ func Create() *Instant {
 		logger: &logger.DefaultLogger{
 			LogLevel: logger.Info,
 		},
-		contexts: map[string]BotContext{},
+		contexts: map[string]botc.BotContext{},
 		event:    event.NewEventSystem(),
 		middleware: &MiddlewareSystem{
 			middlewares: make(map[string]MiddlewareCallback),
@@ -89,8 +90,8 @@ func (i *Instant) initServices() error {
 	for _, service := range i.services {
 		i.logger.Debug("Initializing service %s", service.Name())
 		if err := service.Init(i); err != nil {
-			i.logger.Error("Failed to initialize service %s: %s", service.Name(), err.Error())
-			return err
+			i.logger.Error("Failed to initialize service %s: %v", service.Name(), err)
+			continue
 		}
 		i.logger.Debug("Initialized service %s success", service.Name())
 	}
@@ -101,30 +102,31 @@ func (i *Instant) releaseServices() {
 	for _, service := range i.services {
 		i.logger.Debug("Releasing service %s", service.Name())
 		if err := service.Release(i); err != nil {
-			i.logger.Error("Failed to release service %s: %s", service.Name(), err.Error())
+			i.logger.Error("Failed to release service %s: %v", service.Name(), err)
+			continue
 		}
 		i.logger.Debug("Released service %s success", service.Name())
 	}
 }
 
-func (i *Instant) AddContext(context BotContext) bool {
-	if _, ok := i.contexts[context.Name()]; ok {
+func (i *Instant) AddContext(context botc.BotContext) bool {
+	if _, ok := i.contexts[context.Protocol()]; ok {
 		return false
 	}
-	i.contexts[context.ID()] = context
+	i.contexts[context.Protocol()] = context
 	return true
 }
 
-func (i *Instant) GetContext(id string) BotContext {
-	if context, ok := i.contexts[id]; ok {
+func (i *Instant) GetContext(protocol string) botc.BotContext {
+	if context, ok := i.contexts[protocol]; ok {
 		return context
 	}
 	return nil
 }
 
-func (i *Instant) RemoveContext(id string) bool {
-	if _, ok := i.contexts[id]; ok {
-		delete(i.contexts, id)
+func (i *Instant) RemoveContext(protocol string) bool {
+	if _, ok := i.contexts[protocol]; ok {
+		delete(i.contexts, protocol)
 		return true
 	}
 	return false
@@ -140,11 +142,10 @@ func (i *Instant) Run() error {
 		if err := util.MkdirIfNotExists("conf/"); err != nil {
 			return err
 		}
-		if err := conic.WriteConfig(); err != nil {
-			return err
+		if err := os.WriteFile(ConfigPath, DefaultConfig, 0644); err != nil {
+			return fmt.Errorf("failed to create config file: %v", err)
 		}
-		i.logger.Warning("Config file created.")
-		return fmt.Errorf("config file not exist")
+		i.logger.Warning("Config file does not exist, using default config.")
 	}
 
 	if err := conic.ReadConfig(); err != nil {

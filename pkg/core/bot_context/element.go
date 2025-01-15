@@ -1,6 +1,6 @@
-package message
+package bot_context
 
-type Element struct {
+type MessageElement struct {
 	Type    ElementType
 	Content string
 	Source  string

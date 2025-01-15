@@ -1,15 +1,13 @@
-package GoroBot
-
-import "github.com/Jel1ySpot/GoroBot/pkg/core/message"
+package bot_context
 
 type MessageBuilder interface {
 	Protocol() string
 	Text(text string) MessageBuilder
-	Quote(msg *message.Base) MessageBuilder
+	Quote(msg *BaseMessage) MessageBuilder
 	Mention(id string) MessageBuilder
 	ImageFromFile(path string) MessageBuilder
 	ImageFromUrl(url string) MessageBuilder
 	ImageFromData(data []byte) MessageBuilder
-	ReplyTo(msg message.Context) error
-	Send(ctx BotContext, messageType message.Type, id string) error
+	ReplyTo(msg MessageContext) (*BaseMessage, error)
+	Send(messageType MessageType, id string) (*BaseMessage, error)
 }

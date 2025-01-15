@@ -1,18 +1,21 @@
 package lagrange
 
 import (
-	"github.com/Jel1ySpot/GoroBot/pkg/core/message"
+	"fmt"
+	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	LgrMessage "github.com/LagrangeDev/LagrangeGo/message"
-	"strconv"
-	"time"
 )
 
 type MessageContext struct {
-	messageType message.Type
+	messageType botc.MessageType
 	service     *Service
-	base        *message.Base
+	base        *botc.BaseMessage
 	privateMsg  *LgrMessage.PrivateMessage
 	groupMsg    *LgrMessage.GroupMessage
+}
+
+func (m *MessageContext) BotContext() botc.BotContext {
+	return &Context{ m.service }
 }
 
 func (m *MessageContext) Protocol() string {
@@ -23,13 +26,13 @@ func NewMessageContext(msg any, service *Service) *MessageContext {
 	switch msg := msg.(type) {
 	case *LgrMessage.PrivateMessage:
 		return &MessageContext{
-			messageType: message.DirectMessage,
+			messageType: botc.DirectMessage,
 			service:     service,
 			privateMsg:  msg,
 		}
 	case *LgrMessage.GroupMessage:
 		return &MessageContext{
-			messageType: message.GroupMessage,
+			messageType: botc.GroupMessage,
 			service:     service,
 			groupMsg:    msg,
 		}
@@ -39,46 +42,38 @@ func NewMessageContext(msg any, service *Service) *MessageContext {
 
 func (m *MessageContext) String() string {
 	switch m.messageType {
-	case message.DirectMessage:
+	case botc.DirectMessage:
 		return LgrMessage.ToReadableString(m.privateMsg.Elements)
-	case message.GroupMessage:
+	case botc.GroupMessage:
 		return LgrMessage.ToReadableString(m.groupMsg.Elements)
 	}
 	return ""
 }
 
-func (m *MessageContext) Message() *message.Base {
+func (m *MessageContext) Message() *botc.BaseMessage {
 	if m.base == nil {
 		switch m.messageType {
-		case message.DirectMessage:
-			m.base = &message.Base{
-				MessageType: m.messageType,
-				ID:          strconv.FormatUint(uint64(m.privateMsg.ID), 10),
-				Content:     m.String(),
-				Elements:    m.service.FromMessageElements(m.privateMsg.Elements, m.privateMsg),
-				Sender:      SenderConv(m.Sender(), m.groupMsg),
-				Time:        time.Unix(int64(m.privateMsg.Time), 0),
-			}
-		case message.GroupMessage:
-			m.base = &message.Base{
-				MessageType: m.messageType,
-				ID:          strconv.FormatUint(uint64(m.groupMsg.ID), 10),
-				Content:     m.String(),
-				Elements:    m.service.FromMessageElements(m.groupMsg.Elements, m.groupMsg),
-				Sender:      SenderConv(m.Sender(), m.groupMsg),
-				Time:        time.Unix(int64(m.groupMsg.Time), 0),
-			}
+		case botc.DirectMessage:
+			m.base, _ = m.service.MessageEventToBase(m.privateMsg)
+		case botc.GroupMessage:
+			m.base, _ = m.service.MessageEventToBase(m.groupMsg)
 		}
 	}
 
 	return m.base
 }
 
+func (m *MessageContext) NewMessageBuilder() botc.MessageBuilder {
+	return &MessageBuilder{
+		service: m.service,
+	}
+}
+
 func (m *MessageContext) OriginalElements() []LgrMessage.IMessageElement {
 	switch m.messageType {
-	case message.DirectMessage:
+	case botc.DirectMessage:
 		return m.privateMsg.Elements
-	case message.GroupMessage:
+	case botc.GroupMessage:
 		return m.groupMsg.Elements
 	}
 	return nil
@@ -86,9 +81,9 @@ func (m *MessageContext) OriginalElements() []LgrMessage.IMessageElement {
 
 func (m *MessageContext) Sender() *LgrMessage.Sender {
 	switch m.messageType {
-	case message.DirectMessage:
+	case botc.DirectMessage:
 		return m.privateMsg.Sender
-	case message.GroupMessage:
+	case botc.GroupMessage:
 		return m.groupMsg.Sender
 	}
 	return nil
@@ -101,25 +96,29 @@ func (m *MessageContext) GroupUin() uint32 {
 	return 0
 }
 
-func (m *MessageContext) reply(elements []LgrMessage.IMessageElement) error {
+func (m *MessageContext) reply(elements []LgrMessage.IMessageElement) (*botc.BaseMessage, error) {
 	switch m.messageType {
-	case message.DirectMessage:
-		if _, err := m.service.qqClient.SendPrivateMessage(m.privateMsg.Sender.Uin, elements); err != nil {
-			return err
+	case botc.DirectMessage:
+		if msg, err := m.service.qqClient.SendPrivateMessage(m.privateMsg.Sender.Uin, elements); err != nil {
+			return nil, err
+		} else {
+			return m.service.MessageEventToBase(msg)
 		}
-	case message.GroupMessage:
-		if _, err := m.service.qqClient.SendGroupMessage(m.groupMsg.GroupUin, elements); err != nil {
-			return err
+	case botc.GroupMessage:
+		if msg, err := m.service.qqClient.SendGroupMessage(m.groupMsg.GroupUin, elements); err != nil {
+			return nil, err
+		} else {
+			return m.service.MessageEventToBase(msg)
 		}
 	}
-	return nil
+	return nil, fmt.Errorf("unhandled message type: %v", m.messageType)
 }
 
-func (m *MessageContext) Reply(msg []*message.Element) error {
+func (m *MessageContext) Reply(msg []*botc.MessageElement) (*botc.BaseMessage, error) {
 	return m.reply(m.service.FromBaseMessage(msg))
 }
 
-func (m *MessageContext) ReplyText(text string) error {
+func (m *MessageContext) ReplyText(text string) (*botc.BaseMessage, error) {
 	return m.reply([]LgrMessage.IMessageElement{
 		LgrMessage.NewText(text),
 	})

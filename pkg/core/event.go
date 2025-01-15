@@ -1,9 +1,9 @@
 package GoroBot
 
 import (
+	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/event"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/message"
 )
 
 type EventHandler struct {
@@ -25,54 +25,54 @@ func (i *Instant) EventUnregister(eventName string) {
 
 func (i *Instant) EventEmit(eventName string, args ...interface{}) error {
 	if eventName == "message" {
-		return i.MessageEmit(args[0].(BotContext), args[1].(message.Context))
+		return i.MessageEmit(args[0].(botc.MessageContext))
 	}
 	if eventName == "command" {
-		i.CommandEmit(args[0].(BotContext), args[1].(*command.Context))
+		i.CommandEmit(args[0].(*command.Context))
 		return nil
 	}
 	return i.event.Emit(eventName, args...)
 }
 
-func (i *Instant) MessageEmit(ctx BotContext, msg message.Context) error {
+func (i *Instant) MessageEmit(msg botc.MessageContext) error {
 	// 中间件
-	return i.middleware.dispatch(ctx, msg, func() error {
+	return i.middleware.dispatch(msg, func() error {
 		go func() {
 			for _, cmdReg := range i.commands.Commands {
-				cmdReg.CheckAlias(ctx, command.NewCommandContext(msg, msg.String()))
+				cmdReg.CheckAlias(command.NewCommandContext(msg, msg.String()))
 			}
 		}()
-		return i.event.Emit("message", ctx, msg)
+		return i.event.Emit("message", msg)
 	})
 }
 
-func (i *Instant) CommandEmit(ctx BotContext, cmd *command.Context) {
+func (i *Instant) CommandEmit(cmd *command.Context) {
 	// 中间件
-	_ = i.middleware.dispatch(ctx, cmd, func() error {
-		go i.event.Emit("message", ctx, cmd.Context)
-		go i.commands.Emit(ctx, cmd)
+	_ = i.middleware.dispatch(cmd, func() error {
+		go i.event.Emit("message", cmd.MessageContext)
+		go i.commands.Emit(cmd)
 		return nil
 	})
 }
 
-type MessageEventCallback func(BotContext, message.Context) error
+type MessageEventCallback func(ctx botc.MessageContext) error
 
 func MessageEvent(callback MessageEventCallback) EventHandler {
 	return EventHandler{
 		Name: "message",
 		Callback: func(args ...interface{}) error {
-			return callback(args[0].(BotContext), args[1].(message.Context))
+			return callback(args[0].(botc.MessageContext))
 		},
 	}
 }
 
-type CommandEventCallback func(BotContext, *command.Context) error
+type CommandEventCallback func(ctx *command.Context) error
 
 func CommandEvent(callback CommandEventCallback) EventHandler {
 	return EventHandler{
 		Name: "command",
 		Callback: func(args ...interface{}) error {
-			return callback(args[0].(BotContext), args[1].(*command.Context))
+			return callback(args[0].(*command.Context))
 		},
 	}
 }

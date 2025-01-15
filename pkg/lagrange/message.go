@@ -2,57 +2,67 @@ package lagrange
 
 import (
 	"fmt"
+	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/message"
 	LgrMessage "github.com/LagrangeDev/LagrangeGo/message"
 	"strconv"
+	"time"
 )
 
-func (s *Service) FromMessageElements(elements []LgrMessage.IMessageElement, msgEvent any) []*message.Element {
-	b := message.NewBuilder()
+func (s *Service) FromMessageElements(msgEvent any) []*botc.MessageElement {
+	b := botc.NewBuilder()
+	var elements []LgrMessage.IMessageElement
+	switch e := msgEvent.(type) {
+	case *LgrMessage.PrivateMessage:
+		elements = e.Elements
+	case *LgrMessage.GroupMessage:
+		elements = e.Elements
+	default:
+		return nil
+	}
 	for _, elem := range elements {
 		switch elem := elem.(type) {
 		case *LgrMessage.TextElement:
-			b.Append(message.TextElement, elem.Content, "")
+			b.Append(botc.TextElement, elem.Content, "")
 		case *LgrMessage.AtElement:
 			b.Append(
-				message.MentionElement,
+				botc.MentionElement,
 				elem.Display,
-				strconv.FormatUint(uint64(elem.TargetUin), 10),
+				GenUserID(elem.TargetUin),
 			)
 		case *LgrMessage.FaceElement:
 			b.Append(
-				message.StickerElement,
+				botc.StickerElement,
 				"[表情]",
 				strconv.FormatUint(uint64(elem.FaceID), 10),
 			)
 		case *LgrMessage.ReplyElement:
-			source := message.Base{
-				MessageType: func() message.Type {
+			source := botc.BaseMessage{
+				MessageType: func() botc.MessageType {
 					if elem.GroupUin > 0 {
-						return message.GroupMessage
+						return botc.GroupMessage
 					}
-					return message.DirectMessage
+					return botc.DirectMessage
 				}(),
-				ID:       strconv.FormatUint(uint64(elem.ReplySeq), 10),
+				ID:       GenMsgSeqID(elem.ReplySeq),
 				Content:  LgrMessage.ToReadableString(elem.Elements),
-				Elements: s.FromMessageElements(elem.Elements, msgEvent),
+				Elements: s.FromMessageElements(msgEvent),
 				Sender: &entity.Sender{
 					User: &entity.User{
 						Base: &entity.Base{
-							ID: strconv.FormatUint(uint64(elem.SenderUin), 10),
+							ID: GenUserID(elem.SenderUin),
 						},
 					},
 					From: func() string {
 						if elem.GroupUin > 0 {
-							return strconv.FormatUint(uint64(elem.GroupUin), 10)
+							return GenGroupID(elem.GroupUin)
 						}
 						return ""
 					}(),
 				},
 			}
 			b.Append(
-				message.QuoteElement,
+				botc.QuoteElement,
 				"[回复]",
 				source.Marshall(),
 			)
@@ -78,7 +88,7 @@ func (s *Service) FromMessageElements(elements []LgrMessage.IMessageElement, msg
 			}
 
 			b.Append(
-				message.VoiceElement,
+				botc.VoiceElement,
 				"[录音]",
 				fmt.Sprintf("%x", elem.Md5),
 			)
@@ -92,7 +102,7 @@ func (s *Service) FromMessageElements(elements []LgrMessage.IMessageElement, msg
 			if elem.URL != "" {
 				url = elem.URL
 			} else {
-				if CheckMessageType(msgEvent) == message.GroupMessage {
+				if CheckMessageType(msgEvent) == botc.GroupMessage {
 					imageElem, err = s.qqClient.QueryGroupImage(elem.Md5, elem.FileUUID)
 				} else {
 					imageElem, err = s.qqClient.QueryFriendImage(elem.Md5, elem.FileUUID)
@@ -110,12 +120,12 @@ func (s *Service) FromMessageElements(elements []LgrMessage.IMessageElement, msg
 			}
 
 			b.Append(
-				message.ImageElement,
+				botc.ImageElement,
 				"[照片]",
 				fmt.Sprintf("%x", elem.Md5),
 			)
 		case *LgrMessage.FileElement:
-			b.Append(message.FileElement,
+			b.Append(botc.FileElement,
 				"[文件]",
 				func() string {
 					switch e := msgEvent.(type) {
@@ -128,14 +138,14 @@ func (s *Service) FromMessageElements(elements []LgrMessage.IMessageElement, msg
 				}(),
 			)
 		case *LgrMessage.ShortVideoElement:
-			url, err := s.qqClient.GetVideoURL(CheckMessageType(msgEvent) == message.GroupMessage, elem.UUID)
+			url, err := s.qqClient.GetVideoURL(CheckMessageType(msgEvent) == botc.GroupMessage, elem.UUID)
 			if err == nil {
 				err = s.bot.SaveResource(fmt.Sprintf("%x", elem.Md5), url)
 			}
 			if err != nil {
 				s.logger.Warning("save short video err: %v", err)
 			}
-			b.Append(message.VideoElement,
+			b.Append(botc.VideoElement,
 				"[视频]",
 				fmt.Sprintf("%x", elem.Md5),
 			)
@@ -144,41 +154,65 @@ func (s *Service) FromMessageElements(elements []LgrMessage.IMessageElement, msg
 	return b.Build()
 }
 
-func (s *Service) FromBaseMessage(msg []*message.Element) []LgrMessage.IMessageElement {
+func (s *Service) MessageEventToBase(msg any) (*botc.BaseMessage, error) {
+	switch msgEvent := msg.(type) {
+	case *LgrMessage.PrivateMessage:
+		return &botc.BaseMessage{
+			MessageType: botc.DirectMessage,
+			ID:          GenMsgSeqID(msgEvent.ID),
+			Content:     msgEvent.ToString(),
+			Elements:    s.FromMessageElements(msg),
+			Sender:      SenderConv(msgEvent.Sender, nil),
+			Time:        time.Unix(int64(msgEvent.Time), 0),
+		}, nil
+	case *LgrMessage.GroupMessage:
+		return &botc.BaseMessage{
+			MessageType: botc.GroupMessage,
+			ID:          GenMsgSeqID(msgEvent.ID),
+			Content:     msgEvent.ToString(),
+			Elements:    s.FromMessageElements(msg),
+			Sender:      SenderConv(msgEvent.Sender, msgEvent),
+			Time:        time.Unix(int64(msgEvent.Time), 0),
+		}, nil
+	}
+	return nil, fmt.Errorf("unhandled message type: %T", msg)
+}
+
+func (s *Service) FromBaseMessage(msg []*botc.MessageElement) []LgrMessage.IMessageElement {
 	b := MessageBuilder{}
 	for _, elem := range msg {
 		switch elem.Type {
-		case message.TextElement:
+		case botc.TextElement:
 			b.Text(elem.Content)
-		case message.QuoteElement:
-			targetMessage, err := message.UnmarshallMessage(elem.Source)
+		case botc.QuoteElement:
+			targetMessage, err := botc.UnmarshallMessage(elem.Source)
 			if err != nil {
 				continue
 			}
 			b.Quote(targetMessage)
-		case message.MentionElement:
+		case botc.MentionElement:
 			b.Mention(elem.Source)
-		case message.ImageElement:
+		case botc.ImageElement:
 			if resource, err := s.bot.GetResource(elem.Source); err == nil {
 				b.ImageFromFile(resource.FilePath)
 			}
-		case message.VideoElement:
+		case botc.VideoElement:
 			if resource, err := s.bot.GetResource(elem.Source); err == nil {
 				b.VideoFromFile(resource.FilePath)
 			}
-		case message.FileElement:
+		case botc.FileElement:
 			if resource, err := s.bot.GetResource(elem.Source); err == nil {
 				b.File(resource.FilePath, elem.Content)
 			}
-		case message.VoiceElement:
+		case botc.VoiceElement:
 			if resource, err := s.bot.GetResource(elem.Source); err == nil {
 				b.Voice(resource.FilePath)
 			}
-		case message.StickerElement:
+		case botc.StickerElement:
 			b.Sticker(elem.Source)
-		case message.LinkElement:
+		case botc.LinkElement:
 			b.Text(elem.Source)
-		case message.OtherElement:
+		case botc.OtherElement:
 			b.Text(elem.Content)
 		}
 	}
