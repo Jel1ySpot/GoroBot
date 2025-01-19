@@ -46,7 +46,7 @@ func (s *Service) log(ctx botc.MessageContext) {
 
 	switch msg.MessageType {
 	case botc.GroupMessage:
-		log.Info("Message from [%s]: [%s]%s(%s): %s", ctx.Protocol(), msg.Sender.From, msg.Sender.Nickname, msg.Sender.ID, msg.Content)
+		log.Info("Message from [%s]: [%s]%s: %s", ctx.Protocol(), msg.Sender.From.Name, msg.Sender.Nickname, msg.Content)
 	case botc.DirectMessage:
 		log.Info("Message from [%s]: %s(%s): %s", ctx.Protocol(), msg.Sender.Name, msg.Sender.ID, msg.Content)
 	}

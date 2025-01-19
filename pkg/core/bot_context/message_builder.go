@@ -9,5 +9,5 @@ type MessageBuilder interface {
 	ImageFromUrl(url string) MessageBuilder
 	ImageFromData(data []byte) MessageBuilder
 	ReplyTo(msg MessageContext) (*BaseMessage, error)
-	Send(messageType MessageType, id string) (*BaseMessage, error)
+	Send(id string) (*BaseMessage, error)
 }

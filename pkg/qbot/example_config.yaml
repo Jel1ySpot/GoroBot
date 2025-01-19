@@ -1,0 +1,12 @@
+debug: false
+api:
+    appid: "your app id"
+    secret: "your secret key"
+http:
+    host: "0.0.0.0"
+    path: "/bot"
+    port: 8443
+    base_url: "http://your.domain.net:8443"
+    tls:
+        cert_path: "/path/to/server.crt"
+        key_path: "/path/to/server.key"

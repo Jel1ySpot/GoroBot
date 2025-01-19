@@ -6,6 +6,6 @@ type MessageContext interface {
 	String() string
 	Message() *BaseMessage
 	NewMessageBuilder() MessageBuilder
-	Reply(message []*MessageElement) (*BaseMessage, error)
+	Reply(elements []*MessageElement) (*BaseMessage, error)
 	ReplyText(text string) (*BaseMessage, error)
 }

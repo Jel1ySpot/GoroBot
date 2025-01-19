@@ -80,7 +80,11 @@ func (r *Registry) CheckAlias(cmdCtx *Context) { // 在消息事件触发时调�
 		if reg.MatchString(cmdCtx.ArgumentString) { // 如果匹配指令别名
 			cmdCtx.Command = r.format.Name
 			matches := reg.FindStringSubmatch(cmdCtx.ArgumentString) // 正则中的子串
-			for _, arg := range r.format.Arguments {                 // 遍历参数
+			if opts == nil {
+				r.handler(cmdCtx)
+				continue
+			}
+			for _, arg := range r.format.Arguments { // 遍历参数
 				if val, ok := opts[arg.Name]; ok {
 					if strings.HasPrefix(val, "$") { // 如果格式为 "$SubExpName"
 						if i := reg.SubexpIndex(val[1:]); i != -1 { // 如果子串存在

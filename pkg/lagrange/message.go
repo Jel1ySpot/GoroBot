@@ -3,13 +3,12 @@ package lagrange
 import (
 	"fmt"
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
 	LgrMessage "github.com/LagrangeDev/LagrangeGo/message"
 	"strconv"
 	"time"
 )
 
-func (s *Service) FromMessageElements(msgEvent any) []*botc.MessageElement {
+func ParseElementsFromEvent(service *Service, msgEvent any) []*botc.MessageElement {
 	b := botc.NewBuilder()
 	var elements []LgrMessage.IMessageElement
 	switch e := msgEvent.(type) {
@@ -37,34 +36,10 @@ func (s *Service) FromMessageElements(msgEvent any) []*botc.MessageElement {
 				strconv.FormatUint(uint64(elem.FaceID), 10),
 			)
 		case *LgrMessage.ReplyElement:
-			source := botc.BaseMessage{
-				MessageType: func() botc.MessageType {
-					if elem.GroupUin > 0 {
-						return botc.GroupMessage
-					}
-					return botc.DirectMessage
-				}(),
-				ID:       GenMsgSeqID(elem.ReplySeq),
-				Content:  LgrMessage.ToReadableString(elem.Elements),
-				Elements: s.FromMessageElements(msgEvent),
-				Sender: &entity.Sender{
-					User: &entity.User{
-						Base: &entity.Base{
-							ID: GenUserID(elem.SenderUin),
-						},
-					},
-					From: func() string {
-						if elem.GroupUin > 0 {
-							return GenGroupID(elem.GroupUin)
-						}
-						return ""
-					}(),
-				},
-			}
 			b.Append(
 				botc.QuoteElement,
 				"[回复]",
-				source.Marshall(),
+				ReplyElementToMessage(service, elem).Marshall(),
 			)
 		case *LgrMessage.VoiceElement:
 			var (
@@ -73,18 +48,18 @@ func (s *Service) FromMessageElements(msgEvent any) []*botc.MessageElement {
 			)
 			switch msgEvent := msgEvent.(type) {
 			case *LgrMessage.GroupMessage:
-				url, err = s.qqClient.GetGroupRecordURL(msgEvent.GroupUin, elem.Node)
+				url, err = service.qqClient.GetGroupRecordURL(msgEvent.GroupUin, elem.Node)
 				if err == nil {
-					err = s.bot.SaveResource(fmt.Sprintf("%x", elem.Md5), url)
+					_, err = service.grb.SaveRemoteResource(url)
 				}
 			case *LgrMessage.PrivateMessage:
-				url, err = s.qqClient.GetPrivateRecordURL(elem.Node)
+				url, err = service.qqClient.GetPrivateRecordURL(elem.Node)
 				if err == nil {
-					err = s.bot.SaveResource(fmt.Sprintf("%x", elem.Md5), url)
+					_, err = service.grb.SaveRemoteResource(url)
 				}
 			}
 			if err != nil {
-				s.logger.Warning("save voice err: %v", err)
+				service.logger.Warning("save voice err: %v", err)
 			}
 
 			b.Append(
@@ -103,9 +78,9 @@ func (s *Service) FromMessageElements(msgEvent any) []*botc.MessageElement {
 				url = elem.URL
 			} else {
 				if CheckMessageType(msgEvent) == botc.GroupMessage {
-					imageElem, err = s.qqClient.QueryGroupImage(elem.Md5, elem.FileUUID)
+					imageElem, err = service.qqClient.QueryGroupImage(elem.Md5, elem.FileUUID)
 				} else {
-					imageElem, err = s.qqClient.QueryFriendImage(elem.Md5, elem.FileUUID)
+					imageElem, err = service.qqClient.QueryFriendImage(elem.Md5, elem.FileUUID)
 				}
 				if err == nil {
 					url = imageElem.URL
@@ -113,15 +88,23 @@ func (s *Service) FromMessageElements(msgEvent any) []*botc.MessageElement {
 			}
 
 			if err == nil {
-				err = s.bot.SaveResource(fmt.Sprintf("%x", elem.Md5), url)
+				_, err = service.grb.SaveRemoteResource(url)
 			}
 			if err != nil {
-				s.logger.Warning("save image err: %v", err)
+				service.logger.Warning("save image err: %v", err)
 			}
 
 			b.Append(
 				botc.ImageElement,
-				"[照片]",
+				func() string {
+					if elem.Summary != "" {
+						return elem.Summary
+					}
+					if elem.SubType == 7 {
+						return "[动画表情]"
+					}
+					return "[图片]"
+				}(),
 				fmt.Sprintf("%x", elem.Md5),
 			)
 		case *LgrMessage.FileElement:
@@ -138,12 +121,12 @@ func (s *Service) FromMessageElements(msgEvent any) []*botc.MessageElement {
 				}(),
 			)
 		case *LgrMessage.ShortVideoElement:
-			url, err := s.qqClient.GetVideoURL(CheckMessageType(msgEvent) == botc.GroupMessage, elem.UUID)
+			url, err := service.qqClient.GetVideoURL(CheckMessageType(msgEvent) == botc.GroupMessage, elem.UUID)
 			if err == nil {
-				err = s.bot.SaveResource(fmt.Sprintf("%x", elem.Md5), url)
+				_, err = service.grb.SaveRemoteResource(url)
 			}
 			if err != nil {
-				s.logger.Warning("save short video err: %v", err)
+				service.logger.Warning("save short video err: %v", err)
 			}
 			b.Append(botc.VideoElement,
 				"[视频]",
@@ -154,14 +137,16 @@ func (s *Service) FromMessageElements(msgEvent any) []*botc.MessageElement {
 	return b.Build()
 }
 
-func (s *Service) MessageEventToBase(msg any) (*botc.BaseMessage, error) {
-	switch msgEvent := msg.(type) {
+func ParseMessageEvent(service *Service, msgEvent any) (*botc.BaseMessage, error) {
+	elems := ParseElementsFromEvent(service, msgEvent)
+	content := botc.ElemsToString(elems)
+	switch msgEvent := msgEvent.(type) {
 	case *LgrMessage.PrivateMessage:
 		return &botc.BaseMessage{
 			MessageType: botc.DirectMessage,
 			ID:          GenMsgSeqID(msgEvent.ID),
-			Content:     msgEvent.ToString(),
-			Elements:    s.FromMessageElements(msg),
+			Content:     content,
+			Elements:    elems,
 			Sender:      SenderConv(msgEvent.Sender, nil),
 			Time:        time.Unix(int64(msgEvent.Time), 0),
 		}, nil
@@ -169,18 +154,18 @@ func (s *Service) MessageEventToBase(msg any) (*botc.BaseMessage, error) {
 		return &botc.BaseMessage{
 			MessageType: botc.GroupMessage,
 			ID:          GenMsgSeqID(msgEvent.ID),
-			Content:     msgEvent.ToString(),
-			Elements:    s.FromMessageElements(msg),
+			Content:     content,
+			Elements:    elems,
 			Sender:      SenderConv(msgEvent.Sender, msgEvent),
 			Time:        time.Unix(int64(msgEvent.Time), 0),
 		}, nil
 	}
-	return nil, fmt.Errorf("unhandled message type: %T", msg)
+	return nil, fmt.Errorf("unhandled message type: %T", msgEvent)
 }
 
-func (s *Service) FromBaseMessage(msg []*botc.MessageElement) []LgrMessage.IMessageElement {
+func TranslateMessageElement(service *Service, elements []*botc.MessageElement) []LgrMessage.IMessageElement {
 	b := MessageBuilder{}
-	for _, elem := range msg {
+	for _, elem := range elements {
 		switch elem.Type {
 		case botc.TextElement:
 			b.Text(elem.Content)
@@ -193,19 +178,19 @@ func (s *Service) FromBaseMessage(msg []*botc.MessageElement) []LgrMessage.IMess
 		case botc.MentionElement:
 			b.Mention(elem.Source)
 		case botc.ImageElement:
-			if resource, err := s.bot.GetResource(elem.Source); err == nil {
+			if resource, err := service.grb.GetResource(elem.Source); err == nil {
 				b.ImageFromFile(resource.FilePath)
 			}
 		case botc.VideoElement:
-			if resource, err := s.bot.GetResource(elem.Source); err == nil {
+			if resource, err := service.grb.GetResource(elem.Source); err == nil {
 				b.VideoFromFile(resource.FilePath)
 			}
 		case botc.FileElement:
-			if resource, err := s.bot.GetResource(elem.Source); err == nil {
+			if resource, err := service.grb.GetResource(elem.Source); err == nil {
 				b.File(resource.FilePath, elem.Content)
 			}
 		case botc.VoiceElement:
-			if resource, err := s.bot.GetResource(elem.Source); err == nil {
+			if resource, err := service.grb.GetResource(elem.Source); err == nil {
 				b.Voice(resource.FilePath)
 			}
 		case botc.StickerElement:

@@ -1,5 +1,10 @@
 package entity
 
+type Sender struct {
+	*User
+	From *Base
+}
+
 type User struct {
 	*Base
 	Nickname  string

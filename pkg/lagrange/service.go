@@ -19,7 +19,7 @@ type Service struct {
 	ConfigPath string
 	config     Config
 	qqClient   *client.QQClient
-	bot        *GoroBot.Instant
+	grb        *GoroBot.Instant
 	owner      uint32
 	status     botc.LoginStatus
 
@@ -28,7 +28,7 @@ type Service struct {
 }
 
 func (s *Service) Name() string {
-	return "Lagrange"
+	return "Lagrange-adapter"
 }
 
 func Create() *Service {
@@ -47,7 +47,7 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 	// https://blog.csdn.net/weixin_45760685/article/details/140629746
 	_ = os.Setenv("GODEBUG", "tlsrsakex=1")
 
-	s.bot = grb
+	s.grb = grb
 	s.logger = grb.GetLogger()
 	if id, ok := grb.GetOwner("qq"); ok {
 		if uin, err := strconv.ParseUint(id, 10, 32); err == nil {
@@ -96,10 +96,10 @@ func (s *Service) saveSig() {
 		s.logger.Error("marshal sig.bin err: %s", err)
 		return
 	}
-	err = os.WriteFile(path.Join(DefaultConfigPath, s.config.Account.SigPath), data, 0644)
+	err = os.WriteFile(path.Join(s.ConfigPath, s.config.Account.SigPath), data, 0644)
 	if err != nil {
 		s.logger.Error("write sig.bin err: %s", err)
 		return
 	}
-	s.logger.Info("sig saved into %s", path.Join(DefaultConfigPath, s.config.Account.SigPath))
+	s.logger.Info("sig saved into %s", path.Join(s.ConfigPath, s.config.Account.SigPath))
 }

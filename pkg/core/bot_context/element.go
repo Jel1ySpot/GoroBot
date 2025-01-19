@@ -20,3 +20,11 @@ const (
 	LinkElement
 	OtherElement
 )
+
+func ElemsToString(elems []*MessageElement) string {
+	content := ""
+	for _, elem := range elems {
+		content += elem.Content
+	}
+	return content
+}

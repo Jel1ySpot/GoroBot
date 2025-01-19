@@ -3,6 +3,7 @@ package lagrange
 import (
 	"fmt"
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
+	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
 	LgrMessage "github.com/LagrangeDev/LagrangeGo/message"
 	"io"
 	"net/http"
@@ -39,7 +40,7 @@ func (b *MessageBuilder) Quote(msg *botc.BaseMessage) botc.MessageBuilder {
 			Sender: &LgrMessage.Sender{
 				Uin: sender,
 			},
-			Elements: b.service.FromBaseMessage(msg.Elements),
+			Elements: TranslateMessageElement(b.service, msg.Elements),
 		}))
 	case botc.GroupMessage:
 		b.elements = append(b.elements, LgrMessage.NewGroupReply(&LgrMessage.GroupMessage{
@@ -48,7 +49,7 @@ func (b *MessageBuilder) Quote(msg *botc.BaseMessage) botc.MessageBuilder {
 			Sender: &LgrMessage.Sender{
 				Uin: sender,
 			},
-			Elements: b.service.FromBaseMessage(msg.Elements),
+			Elements: TranslateMessageElement(b.service, msg.Elements),
 		}))
 	}
 	return b
@@ -89,6 +90,31 @@ func (b *MessageBuilder) ImageFromUrl(url string) botc.MessageBuilder {
 	if err == nil {
 		b.elements = append(b.elements, LgrMessage.NewImage(data))
 	}
+	return b
+}
+
+func (b *MessageBuilder) Image(path string, data []byte, isSticker bool, summary ...string) botc.MessageBuilder {
+	var (
+		elem *LgrMessage.ImageElement
+		err  error
+	)
+	if path != "" {
+		elem, err = LgrMessage.NewFileImage(path, summary...)
+	} else if data != nil {
+		elem = LgrMessage.NewImage(data, summary...)
+	} else {
+		return b
+	}
+	if err != nil {
+		return b
+	}
+	if isSticker {
+		if summary == nil {
+			elem.Summary = "[动画表情]"
+		}
+		elem.SubType = 7
+	}
+	b.elements = append(b.elements, elem)
 	return b
 }
 
@@ -143,27 +169,32 @@ func (b *MessageBuilder) ReplyTo(msg botc.MessageContext) (*botc.BaseMessage, er
 	return msg.(*MessageContext).reply(b.elements)
 }
 
-func (b *MessageBuilder) Send(messageType botc.MessageType, id string) (*botc.BaseMessage, error) {
-	uin, err := strconv.ParseUint(id, 10, 32)
+func (b *MessageBuilder) Send(id string) (*botc.BaseMessage, error) {
+	info, ok := entity.ParseInfo(id)
+	if !ok || info.Protocol != "lagrange" {
+		return nil, fmt.Errorf("invalid id %s", id)
+	}
+	idType := info.Args[0]
+	uin, err := strconv.ParseUint(info.Args[1], 10, 32)
 	if err != nil {
-		return nil, fmt.Errorf("cannot convert id %s to uin", id)
+		return nil, fmt.Errorf("cannot convert id %s to uin", info.Args[1])
 	}
 
 	client := b.service.qqClient
 
-	switch messageType {
-	case botc.DirectMessage:
+	switch idType {
+	case "user":
 		if event, err := client.SendPrivateMessage(uint32(uin), b.elements); err != nil {
 			return nil, err
 		} else {
-			return b.service.MessageEventToBase(event)
+			return ParseMessageEvent(b.service, event)
 		}
-	case botc.GroupMessage:
+	case "group":
 		if event, err := client.SendGroupMessage(uint32(uin), b.elements); err != nil {
 			return nil, err
 		} else {
-			return b.service.MessageEventToBase(event)
+			return ParseMessageEvent(b.service, event)
 		}
 	}
-	return nil, fmt.Errorf("unhandled message type %d", messageType)
+	return nil, fmt.Errorf("unhandled id type %s", idType)
 }

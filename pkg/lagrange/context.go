@@ -17,7 +17,7 @@ func (ctx *Context) ID() string {
 }
 
 func (ctx *Context) Name() string {
-	return "Lagrange-adapter"
+	return "Lagrange"
 }
 
 func (ctx *Context) Protocol() string {
@@ -40,12 +40,12 @@ func (ctx *Context) SendDirectMessage(target entity.User, elements []*botc.Messa
 		return nil, fmt.Errorf("invalid uin %s", target.ID)
 	}
 
-	elems := ctx.service.FromBaseMessage(elements)
+	elems := TranslateMessageElement(ctx.service, elements)
 
 	if msg, err := ctx.service.qqClient.SendPrivateMessage(uint32(uin), elems); err != nil {
 		return nil, err
 	} else {
-		return ctx.service.MessageEventToBase(msg)
+		return ParseMessageEvent(ctx.service, msg)
 	}
 }
 
@@ -55,12 +55,12 @@ func (ctx *Context) SendGroupMessage(target entity.Group, elements []*botc.Messa
 		return nil, fmt.Errorf("invalid uin %s", target.ID)
 	}
 
-	elems := ctx.service.FromBaseMessage(elements)
+	elems := TranslateMessageElement(ctx.service, elements)
 
 	if msg, err := ctx.service.qqClient.SendGroupMessage(uint32(uin), elems); err != nil {
 		return nil, err
 	} else {
-		return ctx.service.MessageEventToBase(msg)
+		return ParseMessageEvent(ctx.service, msg)
 	}
 }
 

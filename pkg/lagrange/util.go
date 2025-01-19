@@ -6,6 +6,8 @@ import (
 	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
 	LgrMessage "github.com/LagrangeDev/LagrangeGo/message"
 	"strconv"
+	"time"
+	"unsafe"
 )
 
 func CheckMessageType(msg any) botc.MessageType {
@@ -18,10 +20,58 @@ func CheckMessageType(msg any) botc.MessageType {
 	return -1
 }
 
+func ReplyElementToMessage(service *Service, elem *LgrMessage.ReplyElement) *botc.BaseMessage {
+	var event any
+
+	isGroup := elem.GroupUin > 0
+	if isGroup {
+		event = &LgrMessage.GroupMessage{
+			ID:       elem.ReplySeq,
+			GroupUin: elem.GroupUin,
+			Sender: &LgrMessage.Sender{
+				Uin: elem.SenderUin,
+			},
+			Time:     elem.Time,
+			Elements: elem.Elements,
+		}
+	} else {
+		event = &LgrMessage.PrivateMessage{
+			ID: elem.ReplySeq,
+			Sender: &LgrMessage.Sender{
+				Uin: elem.SenderUin,
+				UID: elem.SenderUID,
+			},
+			Time:     elem.Time,
+			Elements: elem.Elements,
+		}
+	}
+	return &botc.BaseMessage{
+		MessageType: botc.MessageType(int(*(*byte)(unsafe.Pointer(&isGroup)))),
+		ID:          GenMsgSeqID(elem.ReplySeq),
+		Content:     LgrMessage.ToReadableString(elem.Elements),
+		Elements:    ParseElementsFromEvent(service, event),
+		Sender: &entity.Sender{
+			User: &entity.User{
+				Base: &entity.Base{
+					ID: GenUserID(elem.SenderUin),
+				},
+			},
+			From: &entity.Base{
+				ID: GenGroupID(elem.GroupUin),
+			},
+		},
+		Time: time.Unix(int64(elem.Time), 0),
+	}
+}
+
 func SenderConv(u *LgrMessage.Sender, group *LgrMessage.GroupMessage) *entity.Sender {
-	from := ""
+	var from *entity.Base
 	if group != nil {
-		from = GenGroupID(group.GroupUin)
+		from = &entity.Base{
+			ID:     GenGroupID(group.GroupUin),
+			Name:   group.GroupName,
+			Avatar: "",
+		}
 	}
 	return &entity.Sender{
 		User: &entity.User{

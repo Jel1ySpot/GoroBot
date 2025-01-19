@@ -23,13 +23,13 @@ type Config struct {
 
 func (s *Service) InitConic() error {
 	c := s.conic
-	c.SetConfigFile(path.Join(DefaultConfigPath, "config.json"))
+	c.SetConfigFile(path.Join(s.ConfigPath, "config.json"))
 	c.WatchConfig()
 	c.BindRef("", &s.config)
 	c.SetLogger(s.logger.Debug)
 
-	if !util.FileExists(path.Join(DefaultConfigPath, "config.json")) {
-		if err := util.MkdirIfNotExists(DefaultConfigPath); err != nil {
+	if !util.FileExists(path.Join(s.ConfigPath, "config.json")) {
+		if err := util.MkdirIfNotExists(s.ConfigPath); err != nil {
 			return err
 		}
 		if err := c.WriteConfig(); err != nil {

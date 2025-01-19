@@ -29,11 +29,11 @@ func (s *Service) messageEventHandler(event any) {
 	msg := NewMessageContext(event, s)
 	if strings.HasPrefix(msg.String(), s.config.CommandPrefix) {
 		text := msg.String()[len(s.config.CommandPrefix):]
-		s.bot.CommandEmit(
+		s.grb.CommandEmit(
 			command.NewCommandContext(msg, text),
 		)
 	} else {
-		_ = s.bot.MessageEmit(
+		_ = s.grb.MessageEmit(
 			msg,
 		)
 	}

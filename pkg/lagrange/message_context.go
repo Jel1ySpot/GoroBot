@@ -15,7 +15,7 @@ type MessageContext struct {
 }
 
 func (m *MessageContext) BotContext() botc.BotContext {
-	return &Context{ m.service }
+	return &Context{m.service}
 }
 
 func (m *MessageContext) Protocol() string {
@@ -54,9 +54,9 @@ func (m *MessageContext) Message() *botc.BaseMessage {
 	if m.base == nil {
 		switch m.messageType {
 		case botc.DirectMessage:
-			m.base, _ = m.service.MessageEventToBase(m.privateMsg)
+			m.base, _ = ParseMessageEvent(m.service, m.privateMsg)
 		case botc.GroupMessage:
-			m.base, _ = m.service.MessageEventToBase(m.groupMsg)
+			m.base, _ = ParseMessageEvent(m.service, m.groupMsg)
 		}
 	}
 
@@ -102,20 +102,20 @@ func (m *MessageContext) reply(elements []LgrMessage.IMessageElement) (*botc.Bas
 		if msg, err := m.service.qqClient.SendPrivateMessage(m.privateMsg.Sender.Uin, elements); err != nil {
 			return nil, err
 		} else {
-			return m.service.MessageEventToBase(msg)
+			return ParseMessageEvent(m.service, msg)
 		}
 	case botc.GroupMessage:
 		if msg, err := m.service.qqClient.SendGroupMessage(m.groupMsg.GroupUin, elements); err != nil {
 			return nil, err
 		} else {
-			return m.service.MessageEventToBase(msg)
+			return ParseMessageEvent(m.service, msg)
 		}
 	}
 	return nil, fmt.Errorf("unhandled message type: %v", m.messageType)
 }
 
 func (m *MessageContext) Reply(msg []*botc.MessageElement) (*botc.BaseMessage, error) {
-	return m.reply(m.service.FromBaseMessage(msg))
+	return m.reply(TranslateMessageElement(m.service, msg))
 }
 
 func (m *MessageContext) ReplyText(text string) (*botc.BaseMessage, error) {

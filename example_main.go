@@ -4,7 +4,6 @@ import (
 	"github.com/Jel1ySpot/GoroBot/example_plugin/message_logger"
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/message"
 	LgrClient "github.com/Jel1ySpot/GoroBot/pkg/lagrange"
 )
 

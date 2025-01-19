@@ -1,7 +1,9 @@
 package GoroBot
 
 import (
+	"crypto/md5"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -19,41 +22,80 @@ type Resource struct {
 	Downloaded time.Time // 资源下载时间
 }
 
-// SaveResource 保存资源文件，并更新资源索引
-func (i *Instant) SaveResource(resourceID string, resourceURL string) error {
-	if resourceID == "" || resourceURL == "" {
-		return fmt.Errorf("resourceID or resourceURL is empty")
-	}
-
-	if i.ResourceExists(resourceID) {
-		return nil
+// SaveRemoteResource 保存资源文件，并更新资源索引
+func (i *Instant) SaveRemoteResource(resourceURL string) (*Resource, error) {
+	if resourceURL == "" {
+		return nil, fmt.Errorf("resourceURL is empty")
 	}
 
 	// 生成资源文件保存路径
 	currentTime := time.Now()
-	resourceFilePath := path.Join("resources", currentTime.Format("2006/01.02"), resourceID)
-
-	resource := Resource{
-		ID:         resourceID,
-		FilePath:   resourceFilePath,
-		Downloaded: currentTime,
-	}
+	resourceDirPath := path.Join("resources", currentTime.Format("2006/01.02"))
 
 	// 下载资源文件并更新路径
-	downloadedFilePath, err := downloadFileWithRetry(resourceFilePath, resourceURL)
+	data, fileName, err := downloadFileWithRetry(resourceURL)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	resource.FilePath = downloadedFilePath
+
+	id := strings.TrimSuffix(fileName, filepath.Ext(fileName))
+
+	if i.ResourceExists(id) {
+		return nil, fmt.Errorf("resource %s already exists", resourceURL)
+	}
+
+	filePath := path.Join(resourceDirPath, fileName)
+
+	if _, err := os.Stat(resourceDirPath); os.IsNotExist(err) {
+		if err := os.Mkdir(resourceDirPath, os.ModePerm); err != nil {
+			return nil, fmt.Errorf("error creating resource dir %s: %v", resourceDirPath, err)
+		}
+	}
+
+	if err := os.WriteFile(filePath, data, 0644); err != nil {
+	}
+
+	resource := Resource{
+		ID:         id,
+		FilePath:   filePath,
+		Downloaded: currentTime,
+	}
 
 	// 保存资源索引到数据库
 	if err := i.saveResourceIndex(resource); err != nil {
 		// 如果保存失败，回滚操作并删除下载的资源文件
-		_ = os.Remove(downloadedFilePath)
-		return err
+		_ = os.Remove(filePath)
+		return nil, err
 	}
 
-	return nil
+	return &resource, nil
+}
+
+func (i *Instant) SaveResourceData(data []byte, ext string) (string, error) {
+	hash := md5.Sum(data)
+	id := hex.EncodeToString(hash[:])
+
+	if i.ResourceExists(id) {
+		return id, nil
+	}
+	currentTime := time.Now()
+	resourceFilePath := path.Join("resources", currentTime.Format("2006/01.02"), id+"."+ext)
+
+	resource := Resource{
+		ID:         id,
+		FilePath:   resourceFilePath,
+		Downloaded: currentTime,
+	}
+
+	if err := os.WriteFile(resourceFilePath, data, 0600); err != nil {
+		return "", err
+	}
+
+	if err := i.saveResourceIndex(resource); err != nil {
+		return "", err
+	}
+
+	return id, nil
 }
 
 // saveResourceIndex 保存资源的元数据索引到内存和数据库
@@ -127,8 +169,16 @@ func (i *Instant) GetResource(resourceID string) (Resource, error) {
 	}, nil
 }
 
+func (i *Instant) GetResourceData(resourceID string) ([]byte, error) {
+	resource, err := i.GetResource(resourceID)
+	if err != nil {
+		return nil, err
+	}
+	return os.ReadFile(resource.FilePath)
+}
+
 // downloadFileWithRetry 尝试下载文件，带有重试机制
-func downloadFileWithRetry(filePath string, url string, retryCount ...int) (string, error) {
+func downloadFileWithRetry(url string, retryCount ...int) (data []byte, fileName string, err error) {
 	// 默认重试次数
 	maxRetries := 5
 	if len(retryCount) > 0 && retryCount[0] >= 0 {
@@ -137,54 +187,41 @@ func downloadFileWithRetry(filePath string, url string, retryCount ...int) (stri
 
 	// 尝试下载文件，最多重试 maxRetries 次
 	for retries := 0; retries < maxRetries; retries++ {
-		downloadedFilePath, err := downloadFile(filePath, url)
+		data, fileName, err = downloadFile(url)
 		if err == nil {
-			return downloadedFilePath, nil
-		}
-		if retries == maxRetries-1 {
-			return "", fmt.Errorf("failed to download file after %d retries", maxRetries)
+			return
 		}
 	}
 
-	return "", fmt.Errorf("unexpected error during file download")
+	return
 }
 
-// downloadFile 下载文件并保存到指定路径
-func downloadFile(filePath string, url string) (string, error) {
-	// 确保文件路径所在的目录存在
-	if _, err := os.Stat(path.Dir(filePath)); os.IsNotExist(err) {
-		if err := os.MkdirAll(path.Dir(filePath), os.ModePerm); err != nil {
-			return "", err
-		}
-	}
-
-	// 发送HTTP GET请求下载文件
+func downloadFile(url string) (data []byte, fileName string, err error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
 	defer resp.Body.Close()
 
-	// 获取文件扩展名
+	if resp.StatusCode != http.StatusOK {
+		return nil, "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
 	ext, err := mime.ExtensionsByType(resp.Header.Get("Content-Type"))
-	if err != nil {
-		nameParse := strings.Split(resp.Header.Get("Content-Disposition"), ".")
+	if name := resp.Header.Get("Content-Disposition"); name != "" {
+		Ext := strings.TrimLeft(path.Ext(name), ".")
 		ext = []string{
-			nameParse[len(nameParse)-1],
+			Ext,
 		}
 	}
-	filePath += ext[0]
 
-	// 读取文件内容并保存
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return filePath, err
+	data, err = io.ReadAll(resp.Body)
+	if err == nil {
+		fileName = calcMd5(data) + "." + ext[0]
 	}
+	return
+}
 
-	// 写入文件
-	if err := os.WriteFile(filePath, data, os.ModePerm); err != nil {
-		return filePath, err
-	}
-
-	return filePath, nil
+func calcMd5(data []byte) string {
+	return fmt.Sprintf("%x", md5.Sum(data))
 }
