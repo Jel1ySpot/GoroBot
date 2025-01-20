@@ -7,8 +7,12 @@ import (
 	"strings"
 )
 
-func FormatUserID(uin uint32) string {
-	return fmt.Sprintf("qbot:user&%d", uin)
+func ParseID(idInfo string) (string, bool) {
+	info, ok := entity.ParseInfo(idInfo)
+	if !ok || info.Protocol != "qbot" || len(info.Args) < 2 {
+		return "", false
+	}
+	return info.Args[1], true
 }
 
 func FormatID(type_ string, v ...string) string {

@@ -44,12 +44,13 @@ func (s *Service) login() error {
 		s.logger.Info("try FastLogin")
 		if err := c.FastLogin(); err != nil {
 			s.logger.Warning("fastLogin fail: %s", err)
-			c.UseSig(auth.SigInfo{})
 		} else {
 			return nil
 		}
 
 		s.logger.Info("login with qrcode")
+		c = client.NewClient(0, "")
+		s.qqClient = c
 		_, uri, err := c.FetchQRCodeDefault()
 		if err != nil {
 			return err

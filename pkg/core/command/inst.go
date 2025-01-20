@@ -5,11 +5,13 @@ import (
 	"strings"
 )
 
-type Format struct {
+type Inst struct {
 	Name      string
 	Options   []Option
 	Arguments []Argument
 	Alias     map[string]map[string]string
+	Subs      map[string]Inst
+	handler   func(ctx *Context)
 }
 
 type Option struct {
@@ -47,4 +49,15 @@ func ParseArgType(s string) (ArgType, error) {
 	default:
 		return StringArg, fmt.Errorf("unknown arg type: %s", s)
 	}
+}
+
+func ParseCommand(test string) (name, last string) {
+	test = strings.TrimSpace(test)
+	split := strings.Split(test, " ")
+	if len(split) == 0 {
+		return "", ""
+	}
+	name = split[0]
+	last = strings.TrimSpace(strings.TrimLeft(name, test))
+	return
 }

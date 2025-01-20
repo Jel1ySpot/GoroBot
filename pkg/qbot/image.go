@@ -5,18 +5,10 @@ import (
 	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
 )
 
-func (s *Service) loadImageData(data []byte, ext string) string {
-	if id, err := s.grb.SaveResourceData(data, ext); err != nil {
-		return ""
-	} else {
-		return id
-	}
-}
-
-var (
-	ImageFileType uint64 = 1
-	VideoFileType        = 2
-	VoiceFileType        = 3
+const (
+	ImageFileType uint64 = iota + 1
+	VideoFileType
+	VoiceFileType
 )
 
 type (
@@ -58,8 +50,4 @@ func (s *Service) UploadFileData(id string, fileType uint64, data []byte) (*File
 		return nil, err
 	}
 	return resp.(*FileInfo), nil
-}
-
-func (s *Service) UploadImageData(id string, data []byte) (*FileInfo, error) {
-	return s.UploadFileData(id, ImageFileType, data)
 }

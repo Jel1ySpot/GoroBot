@@ -22,13 +22,18 @@ func Create() *Service {
 func (s *Service) Init(grb *GoroBot.Instant) error {
 	s.bot = grb
 
-	cmdFn, _ := grb.Command("ping", func(cmd *command.Context) {
-		_, _ = cmd.ReplyText("🏓")
-	}).Alias("^ping$", nil).Build()
+	cmdFn, _ := grb.Command("ping").
+		Alias("^ping$", nil).
+		Action(func(cmd *command.Context) {
+			_, _ = cmd.ReplyText("🏓")
+		}).
+		Build()
 
-	_, _ = grb.Command("test", func(cmd *command.Context) {
-		_, _ = cmd.NewMessageBuilder().ImageFromFile("./test.png").ReplyTo(cmd.MessageContext)
-	}).Build()
+	_, _ = grb.Command("test").
+		Action(func(cmd *command.Context) {
+			_, _ = cmd.NewMessageBuilder().ImageFromFile("./test.png").ReplyTo(cmd.MessageContext)
+		}).
+		Build()
 
 	s.releaseFunc = append(s.releaseFunc, cmdFn)
 

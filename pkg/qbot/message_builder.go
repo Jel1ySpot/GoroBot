@@ -7,15 +7,17 @@ import (
 	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
 	"github.com/tencent-connect/botgo/dto"
+	"net/url"
 	"os"
 	"time"
 )
 
 type MessageBuilder struct {
 	*dto.MessageToCreate
-	fromMsg *MessageContext
-	Media   []byte
-	service *Service
+	fromMsg   *MessageContext
+	MediaData []byte
+	MediaType uint64
+	service   *Service
 }
 
 func NewMessageBuilder(from *MessageContext, service *Service) *MessageBuilder {
@@ -51,6 +53,31 @@ func (m *MessageBuilder) Quote(msg *botc.BaseMessage) botc.MessageBuilder {
 }
 
 func (m *MessageBuilder) Mention(id string) botc.MessageBuilder {
+	info, ok := entity.ParseInfo(id)
+	if ok && info.Protocol == m.Protocol() && info.Args[0] == "user" {
+		m.Text(fmt.Sprintf("<qqbot-at-user id=\"%s\" /> ", info.Args[1]))
+	} else if ok && info.Protocol == m.Protocol() && info.Args[0] == "everyone" {
+		m.Text("<qqbot-at-everyone /> ")
+	}
+	return m
+}
+
+func (m *MessageBuilder) CmdEnter(text string) *MessageBuilder {
+	m.Text(fmt.Sprintf("<qqbot-cmd-enter text=\"%s\" /> ", url.QueryEscape(text)))
+	return m
+}
+
+func (m *MessageBuilder) CmdInput(text, show string, reference bool) *MessageBuilder {
+	if show != "" {
+		show = fmt.Sprintf("show=\"%s\" ", url.QueryEscape(show))
+	}
+
+	m.Text(fmt.Sprintf("<qqbot-cmd-input text=\"%s\" %sreference=\"%t\" /> ", url.QueryEscape(text), show, reference))
+	return m
+}
+
+func (m *MessageBuilder) Emoji(id uint) *MessageBuilder {
+	m.Text(fmt.Sprintf(`<emoji:%d>`, id))
 	return m
 }
 
@@ -65,14 +92,61 @@ func (m *MessageBuilder) ImageFromFile(path string) botc.MessageBuilder {
 func (m *MessageBuilder) ImageFromUrl(url string) botc.MessageBuilder {
 	if resource, err := m.service.grb.SaveRemoteResource(url); err == nil {
 		if data, err := m.service.grb.GetResourceData(resource.ID); err == nil {
-			m.Media = data
+			m.ImageFromData(data)
 		}
 	}
 	return m
 }
 
 func (m *MessageBuilder) ImageFromData(data []byte) botc.MessageBuilder {
-	m.Media = data
+	m.MediaData = data
+	m.MediaType = ImageFileType
+	return m
+}
+
+func (m *MessageBuilder) VideoFromFile(path string) *MessageBuilder {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return m
+	}
+	return m.VideoFromData(data)
+}
+
+func (m *MessageBuilder) VideoFromUrl(url string) *MessageBuilder {
+	if resource, err := m.service.grb.SaveRemoteResource(url); err == nil {
+		if data, err := m.service.grb.GetResourceData(resource.ID); err == nil {
+			m.VideoFromData(data)
+		}
+	}
+	return m
+}
+
+func (m *MessageBuilder) VideoFromData(data []byte) *MessageBuilder {
+	m.MediaData = data
+	m.MediaType = VideoFileType
+	return m
+}
+
+func (m *MessageBuilder) VoiceFromFile(path string) *MessageBuilder {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return m
+	}
+	return m.VoiceFromData(data)
+}
+
+func (m *MessageBuilder) VoiceFromUrl(url string) *MessageBuilder {
+	if resource, err := m.service.grb.SaveRemoteResource(url); err == nil {
+		if data, err := m.service.grb.GetResourceData(resource.ID); err == nil {
+			m.VoiceFromData(data)
+		}
+	}
+	return m
+}
+
+func (m *MessageBuilder) VoiceFromData(data []byte) *MessageBuilder {
+	m.MediaData = data
+	m.MediaType = VoiceFileType
 	return m
 }
 
@@ -109,7 +183,10 @@ func (m *MessageBuilder) ReplyTo(msg botc.MessageContext) (*botc.BaseMessage, er
 }
 
 func (m *MessageBuilder) prePostMedia(id string) error {
-	if data, err := m.service.UploadImageData(id, m.Media); err == nil {
+	if m.MediaData == nil {
+		return nil
+	}
+	if data, err := m.service.UploadFileData(id, m.MediaType, m.MediaData); err == nil {
 		info := dto.MediaInfo{
 			FileInfo: data.FileInfo,
 		}

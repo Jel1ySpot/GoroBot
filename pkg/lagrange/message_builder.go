@@ -13,6 +13,7 @@ import (
 type MessageBuilder struct {
 	service  *Service
 	elements []LgrMessage.IMessageElement
+	err      error
 }
 
 func (b *MessageBuilder) Protocol() string {
@@ -20,10 +21,16 @@ func (b *MessageBuilder) Protocol() string {
 }
 
 func (b *MessageBuilder) Build() []LgrMessage.IMessageElement {
+	if b.err != nil {
+		return nil
+	}
 	return b.elements
 }
 
 func (b *MessageBuilder) Quote(msg *botc.BaseMessage) botc.MessageBuilder {
+	if b.err != nil {
+		return b
+	}
 	id, ok := ParseUin(msg.ID)
 	if !ok {
 		return b
@@ -56,6 +63,9 @@ func (b *MessageBuilder) Quote(msg *botc.BaseMessage) botc.MessageBuilder {
 }
 
 func (b *MessageBuilder) Text(text string) botc.MessageBuilder {
+	if b.err != nil {
+		return b
+	}
 	length := len(b.elements)
 	if length > 0 && b.elements[length-1].Type() == LgrMessage.Text {
 		b.elements[length-1].(*LgrMessage.TextElement).Content += text
@@ -66,22 +76,34 @@ func (b *MessageBuilder) Text(text string) botc.MessageBuilder {
 }
 
 func (b *MessageBuilder) ImageFromFile(path string) botc.MessageBuilder {
+	if b.err != nil {
+		return b
+	}
 	elem, err := LgrMessage.NewFileImage(path)
 	if err == nil {
 		b.elements = append(b.elements, elem)
+	} else {
+		b.err = err
 	}
 	return b
 }
 
 func (b *MessageBuilder) ImageFromData(data []byte) botc.MessageBuilder {
+	if b.err != nil {
+		return b
+	}
 	b.elements = append(b.elements, LgrMessage.NewImage(data))
 	return b
 }
 
 func (b *MessageBuilder) ImageFromUrl(url string) botc.MessageBuilder {
+	if b.err != nil {
+		return b
+	}
 	// 发送HTTP GET请求下载文件
 	resp, err := http.Get(url)
 	if err != nil {
+		b.err = err
 		return b
 	}
 	defer resp.Body.Close()
@@ -94,6 +116,9 @@ func (b *MessageBuilder) ImageFromUrl(url string) botc.MessageBuilder {
 }
 
 func (b *MessageBuilder) Image(path string, data []byte, isSticker bool, summary ...string) botc.MessageBuilder {
+	if b.err != nil {
+		return b
+	}
 	var (
 		elem *LgrMessage.ImageElement
 		err  error
@@ -106,6 +131,7 @@ func (b *MessageBuilder) Image(path string, data []byte, isSticker bool, summary
 		return b
 	}
 	if err != nil {
+		b.err = err
 		return b
 	}
 	if isSticker {
@@ -119,8 +145,12 @@ func (b *MessageBuilder) Image(path string, data []byte, isSticker bool, summary
 }
 
 func (b *MessageBuilder) Mention(id string) botc.MessageBuilder {
+	if b.err != nil {
+		return b
+	}
 	uin, err := strconv.ParseUint(id, 10, 64)
 	if err != nil {
+		b.err = err
 		return b
 	}
 	b.elements = append(b.elements, LgrMessage.NewAt(uint32(uin)))
@@ -128,36 +158,56 @@ func (b *MessageBuilder) Mention(id string) botc.MessageBuilder {
 }
 
 func (b *MessageBuilder) VideoFromFile(path string) botc.MessageBuilder {
+	if b.err != nil {
+		return b
+	}
 	elem, err := LgrMessage.NewFileVideo(path, nil)
 	if err == nil {
 		b.elements = append(b.elements, elem)
+	} else {
+		b.err = err
 	}
 	return b
 }
 
 func (b *MessageBuilder) File(path string, name ...string) botc.MessageBuilder {
+	if b.err != nil {
+		return b
+	}
 	if len(name) > 0 && name[0] == "" {
 		name = nil
 	}
 	elem, err := LgrMessage.NewLocalFile(path, name...)
 	if err == nil {
 		b.elements = append(b.elements, elem)
+	} else {
+		b.err = err
 	}
 	return b
 }
 
 func (b *MessageBuilder) Voice(path string) botc.MessageBuilder {
+	if b.err != nil {
+		return b
+	}
 	elem, err := LgrMessage.NewFileRecord(path)
 	if err == nil {
 		b.elements = append(b.elements, elem)
+	} else {
+		b.err = err
 	}
 	return b
 }
 
 func (b *MessageBuilder) Sticker(sid string) botc.MessageBuilder {
+	if b.err != nil {
+		return b
+	}
 	id, err := strconv.ParseUint(sid, 10, 16)
 	if err == nil {
 		b.elements = append(b.elements, LgrMessage.NewFace(uint16(id)))
+	} else {
+		b.err = err
 	}
 	return b
 }
@@ -165,6 +215,9 @@ func (b *MessageBuilder) Sticker(sid string) botc.MessageBuilder {
 func (b *MessageBuilder) ReplyTo(msg botc.MessageContext) (*botc.BaseMessage, error) {
 	if msg.Protocol() != "lagrange" {
 		return nil, fmt.Errorf("expected protocol 'lagrange', got %s", msg.Protocol())
+	}
+	if b.err != nil {
+		return nil, b.err
 	}
 	return msg.(*MessageContext).reply(b.elements)
 }

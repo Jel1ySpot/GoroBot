@@ -97,6 +97,9 @@ func (m *MessageContext) GroupUin() uint32 {
 }
 
 func (m *MessageContext) reply(elements []LgrMessage.IMessageElement) (*botc.BaseMessage, error) {
+	if elements == nil {
+		return nil, fmt.Errorf("elements is nil")
+	}
 	switch m.messageType {
 	case botc.DirectMessage:
 		if msg, err := m.service.qqClient.SendPrivateMessage(m.privateMsg.Sender.Uin, elements); err != nil {
