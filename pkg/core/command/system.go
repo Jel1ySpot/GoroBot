@@ -60,14 +60,16 @@ func (s *System) Emit(cmdCtx *Context) {
 
 func (r *Registry) Emit(cmdCtx *Context) { // 触发指令Reg
 	if err := r.cmd.Emit(cmdCtx); err != nil {
-		_, _ = cmdCtx.ReplyText(err.Error())
+		if r.cmd.Name == cmdCtx.Command {
+			_, _ = cmdCtx.ReplyText(err.Error())
+		}
 	}
 }
 
 func (i Inst) Emit(cmdCtx *Context) error {
 	err := i.parse(cmdCtx)
 	if cmdCtx.Command != i.Name {
-		return nil
+		return err
 	}
 	for _, i := range i.Subs {
 		if err := i.Emit(cmdCtx); err == nil {
@@ -79,7 +81,9 @@ func (i Inst) Emit(cmdCtx *Context) error {
 		return err
 	}
 
-	i.handler(cmdCtx)
+	if i.handler != nil {
+		i.handler(cmdCtx)
+	}
 
 	return nil
 }
@@ -103,7 +107,9 @@ func (i Inst) CheckAlias(cmdCtx *Context) error { // 在消息事件触发时调
 		cmdCtx.Command = i.Name
 		matches := reg.FindStringSubmatch(cmdCtx.ArgumentString) // 正则中的子串
 		if opts == nil {
-			i.handler(cmdCtx)
+			if i.handler != nil {
+				i.handler(cmdCtx)
+			}
 			continue
 		}
 		for _, arg := range i.Arguments { // 遍历参数
@@ -132,7 +138,9 @@ func (i Inst) CheckAlias(cmdCtx *Context) error { // 在消息事件触发时调
 				cmdCtx.Options[opt.Name] = opt.Default
 			}
 		}
-		i.handler(cmdCtx)
+		if i.handler != nil {
+			i.handler(cmdCtx)
+		}
 	}
 	return nil
 }
@@ -167,7 +175,7 @@ func (i Inst) parse(cmd *Context) error {
 				l = shlex.NewLexer(strings.NewReader(string(text)))
 				reader = getReader(l)
 			} else {
-				cmd.Options[i.Arguments[argIndex].Name] = string(text)
+				cmd.Args[i.Arguments[argIndex].Name] = string(text)
 				return nil
 			}
 		}

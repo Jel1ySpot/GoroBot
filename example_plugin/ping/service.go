@@ -1,6 +1,7 @@
 package ping
 
 import (
+	"fmt"
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
 )
@@ -29,11 +30,26 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 		}).
 		Build()
 
-	_, _ = grb.Command("test").
+	testCmd := grb.Command("test")
+
+	_, _ = testCmd.SubCommand("image").
 		Action(func(cmd *command.Context) {
 			_, _ = cmd.NewMessageBuilder().ImageFromFile("./test.png").ReplyTo(cmd.MessageContext)
-		}).
-		Build()
+		}).Build()
+
+	_, _ = testCmd.SubCommand("args <some> [text:text]").
+		Action(func(cmd *command.Context) {
+			_, _ = cmd.NewMessageBuilder().Text(fmt.Sprintf("%#v", cmd.Args)).ReplyTo(cmd.MessageContext)
+		}).Build()
+
+	_, _ = testCmd.SubCommand("opt").
+		Option("-s [str:string]=default").
+		Option("-t [txt:text]=default").
+		Action(func(ctx *command.Context) {
+			_, _ = ctx.NewMessageBuilder().Text(fmt.Sprintf("%#v", ctx.Options)).ReplyTo(ctx.MessageContext)
+		}).Build()
+
+	_, _ = testCmd.Build()
 
 	s.releaseFunc = append(s.releaseFunc, cmdFn)
 

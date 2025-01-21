@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"regexp"
+	"strings"
 )
 
 var (
@@ -44,6 +45,7 @@ func NewCommandFormatBuilder(format string, callback func(Inst) func()) *FormatB
 }
 
 func (b *FormatBuilder) Arguments(args string) *FormatBuilder {
+	args = strings.TrimSpace(args)
 	arg := ArgumentRegFormat.FindString(args)
 	if arg == "" {
 		return b

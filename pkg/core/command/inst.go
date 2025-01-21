@@ -58,6 +58,6 @@ func ParseCommand(test string) (name, last string) {
 		return "", ""
 	}
 	name = split[0]
-	last = strings.TrimSpace(strings.TrimLeft(name, test))
+	last = strings.TrimSpace(strings.TrimLeft(test, name))
 	return
 }
