@@ -14,6 +14,16 @@
 
 ## 插件
 ### 消息日志
->`import "github.com/Jel1ySpot/GoroBot/example_plugin/message_logger"`
+> `import "github.com/Jel1ySpot/GoroBot/example_plugin/message_logger"`
 
 基础的消息事件监听。将消息预览打印到日志。
+
+### Ping
+> `import "github.com/Jel1ySpot/GoroBot/example_plugin/ping`
+
+检测机器人连接状态，和一些调试命令
+
+### 插件载入
+> `import "github.com/Jel1ySpot/GoroBot/example_plugin/go_plugin`
+
+载入外部插件（限类 Unix 系统）
