@@ -1,6 +1,8 @@
 module github.com/Jel1ySpot/GoroBot
 
-go 1.23.2
+go 1.22.0
+
+toolchain go1.23.2
 
 require (
 	github.com/Jel1ySpot/conic v0.0.4
