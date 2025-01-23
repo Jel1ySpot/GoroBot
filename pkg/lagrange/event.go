@@ -11,7 +11,7 @@ func (s *Service) eventSubscribe() error {
 	qqClient := s.qqClient
 
 	qqClient.DisconnectedEvent.Subscribe(func(client *client.QQClient, event *client.DisconnectedEvent) {
-		s.logger.Warning("连接已断开：%v", event.Message)
+		s.logger.Error("连接已断开：%v", event.Message)
 	})
 
 	qqClient.GroupMessageEvent.Subscribe(func(client *client.QQClient, event *LgrMessage.GroupMessage) {

@@ -23,12 +23,20 @@ func Create() *Service {
 func (s *Service) Init(grb *GoroBot.Instant) error {
 	s.bot = grb
 
-	cmdFn, _ := grb.Command("ping").
+	delFn, _ := grb.Command("ping").
 		Alias("^ping$", nil).
-		Action(func(cmd *command.Context) {
-			_, _ = cmd.ReplyText("🏓")
+		Action(func(ctx *command.Context) {
+			_, _ = ctx.ReplyText("🏓")
 		}).
 		Build()
+
+	s.releaseFunc = append(s.releaseFunc, delFn)
+
+	delFn, _ = grb.Command("whoami").
+		Alias("^我的[Ii][Dd]", nil).
+		Action(func(ctx *command.Context) {
+			_, _ = ctx.ReplyText("你的 ID 是：", ctx.SenderID())
+		}).Build()
 
 	testCmd := grb.Command("test")
 
@@ -50,8 +58,6 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 		}).Build()
 
 	_, _ = testCmd.Build()
-
-	s.releaseFunc = append(s.releaseFunc, cmdFn)
 
 	return nil
 }

@@ -1,6 +1,7 @@
 package qbot
 
 import (
+	"context"
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
 )
@@ -14,7 +15,11 @@ func NewContext(service *Service) *Context {
 }
 
 func (c *Context) ID() string {
-	return c.config.Credentials.AppID
+	u, err := c.api.Me(context.Background())
+	if err != nil {
+		return c.config.Credentials.AppID
+	}
+	return u.ID
 }
 
 func (c *Context) Name() string {

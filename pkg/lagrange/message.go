@@ -59,7 +59,7 @@ func ParseElementsFromEvent(service *Service, msgEvent any) []*botc.MessageEleme
 				}
 			}
 			if err != nil {
-				service.logger.Warning("save voice err: %v", err)
+				service.logger.Error("save voice err: %v", err)
 			}
 
 			b.Append(
@@ -91,7 +91,7 @@ func ParseElementsFromEvent(service *Service, msgEvent any) []*botc.MessageEleme
 				_, err = service.grb.SaveRemoteResource(url)
 			}
 			if err != nil {
-				service.logger.Warning("save image err: %v", err)
+				service.logger.Error("save image err: %v", err)
 			}
 
 			b.Append(
@@ -126,7 +126,7 @@ func ParseElementsFromEvent(service *Service, msgEvent any) []*botc.MessageEleme
 				_, err = service.grb.SaveRemoteResource(url)
 			}
 			if err != nil {
-				service.logger.Warning("save short video err: %v", err)
+				service.logger.Error("save short video err: %v", err)
 			}
 			b.Append(botc.VideoElement,
 				"[视频]",

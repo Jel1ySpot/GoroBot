@@ -41,21 +41,21 @@ func (s *Service) login() error {
 	}
 
 	err = func(c *client.QQClient) error {
-		s.logger.Info("try FastLogin")
+		s.logger.Error("try FastLogin")
 		if err := c.FastLogin(); err != nil {
-			s.logger.Warning("fastLogin fail: %s", err)
+			s.logger.Failed("fastLogin fail: %s", err)
 		} else {
 			return nil
 		}
 
-		s.logger.Info("login with qrcode")
+		s.logger.Error("login with qrcode")
 		c = client.NewClient(0, "")
 		s.qqClient = c
 		_, uri, err := c.FetchQRCodeDefault()
 		if err != nil {
 			return err
 		}
-		s.logger.Warning("QRCode: https://api.qrserver.com/v1/create-qr-code/?data=%s", url.QueryEscape(uri))
+		s.logger.Error("QRCode: https://api.qrserver.com/v1/create-qr-code/?data=%s", url.QueryEscape(uri))
 		for {
 			retCode, err := c.GetQRCodeResult()
 			if err != nil {
@@ -77,7 +77,7 @@ func (s *Service) login() error {
 	if err != nil {
 		return err
 	}
-	s.logger.Info("login successed")
+	s.logger.Success("login successed")
 
 	s.saveSig()
 

@@ -54,33 +54,35 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 		return err
 	}
 
+	log.Info("Start initializing Go plugins")
+
 	for _, file := range plugins {
 		p, err := plugin.Open(file)
 		if err != nil {
-			log.Error("Failed to open plugin %s: %v", file, err)
+			log.Failed("Failed to open plugin %s: %v", file, err)
 			continue
 		}
 
 		sym, err := p.Lookup("RegularCreate")
 		if err != nil {
-			log.Error("Failed to find Create function in plugin %s: %v", file, err)
+			log.Failed("Failed to find Create function in plugin %s: %v", file, err)
 			continue
 		}
 		createFunc, ok := sym.(RegularCreation)
 		if !ok {
-			log.Error("Failed to type assert to RegularCreation in plugin %s: %t", file, sym)
+			log.Failed("Failed to type assert to RegularCreation in plugin %s: %t", file, sym)
 		}
 
 		service := createFunc()
 
 		log.Debug("Initializing plugin service %s", service.Name())
 		if err := service.Init(grb); err != nil {
-			log.Error("Failed to initialize plugin service %s: %v", service.Name(), err)
+			log.Failed("Failed to initialize plugin service %s: %v", service.Name(), err)
 			continue
 		}
 
 		s.services = append(s.services, service)
-		log.Debug("Initialized plugin service %s success", service.Name())
+		log.Success("Initialized plugin service %s success", service.Name())
 	}
 
 	return nil

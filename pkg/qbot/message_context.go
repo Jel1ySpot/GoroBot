@@ -2,6 +2,7 @@ package qbot
 
 import (
 	"context"
+	"fmt"
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/tencent-connect/botgo/dto"
 )
@@ -25,6 +26,10 @@ func (m *MessageContext) String() string {
 
 func (m *MessageContext) Message() *botc.BaseMessage {
 	return m.message.ToBase(m.bot.Service.grb)
+}
+
+func (m *MessageContext) SenderID() string {
+	return m.message.data.Author.ID
 }
 
 func (m *MessageContext) NewMessageBuilder() botc.MessageBuilder {
@@ -67,6 +72,6 @@ func (m *MessageContext) reply(body *dto.MessageToCreate) (*botc.BaseMessage, er
 	return nil, nil
 }
 
-func (m *MessageContext) ReplyText(text string) (*botc.BaseMessage, error) {
-	return m.NewMessageBuilder().Text(text).ReplyTo(m)
+func (m *MessageContext) ReplyText(a ...any) (*botc.BaseMessage, error) {
+	return m.NewMessageBuilder().Text(fmt.Sprint(a...)).ReplyTo(m)
 }

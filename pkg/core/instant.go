@@ -79,10 +79,10 @@ func (i *Instant) Use(service Service) {
 func (i *Instant) Remove(service Service) error {
 	i.logger.Debug("Removing service %s", service.Name())
 	if err := service.Release(i); err != nil {
-		i.logger.Error("Failed to remove service %s: %s", service.Name(), err.Error())
+		i.logger.Failed("Failed to remove service %s: %s", service.Name(), err.Error())
 		return err
 	}
-	i.logger.Debug("Removed service %s success", service.Name())
+	i.logger.Success("Removed service %s success", service.Name())
 	return nil
 }
 
@@ -90,10 +90,10 @@ func (i *Instant) initServices() error {
 	for _, service := range i.services {
 		i.logger.Debug("Initializing service %s", service.Name())
 		if err := service.Init(i); err != nil {
-			i.logger.Error("Failed to initialize service %s: %v", service.Name(), err)
+			i.logger.Failed("Failed to initialize service %s: %v", service.Name(), err)
 			continue
 		}
-		i.logger.Debug("Initialized service %s success", service.Name())
+		i.logger.Success("Initialized service %s success", service.Name())
 	}
 	return nil
 }
@@ -102,18 +102,21 @@ func (i *Instant) releaseServices() {
 	for _, service := range i.services {
 		i.logger.Debug("Releasing service %s", service.Name())
 		if err := service.Release(i); err != nil {
-			i.logger.Error("Failed to release service %s: %v", service.Name(), err)
+			i.logger.Failed("Failed to release service %s: %v", service.Name(), err)
 			continue
 		}
-		i.logger.Debug("Released service %s success", service.Name())
+		i.logger.Success("Released service %s success", service.Name())
 	}
 }
 
 func (i *Instant) AddContext(context botc.BotContext) bool {
-	if _, ok := i.contexts[context.Protocol()]; ok {
+	i.logger.Debug("Adding %s bot context %s", context.Protocol(), context.ID())
+	if _, ok := i.contexts[context.ID()]; ok {
+		i.logger.Failed("Duplicated bot context %s", context.ID())
 		return false
 	}
-	i.contexts[context.Protocol()] = context
+	i.contexts[context.ID()] = context
+	i.logger.Success("Added %s bot context %s", context.Protocol(), context.ID())
 	return true
 }
 
@@ -136,7 +139,7 @@ func (i *Instant) Run() error {
 	conic.SetConfigFile(ConfigPath)
 	conic.WatchConfig()
 	conic.BindRef("", &i.config)
-	conic.SetLogger(i.logger.Info)
+	conic.SetLogger(i.logger.Debug)
 
 	if !util.FileExists(ConfigPath) {
 		if err := util.MkdirIfNotExists("conf/"); err != nil {

@@ -5,7 +5,8 @@ type MessageContext interface {
 	BotContext() BotContext
 	String() string
 	Message() *BaseMessage
+	SenderID() string
 	NewMessageBuilder() MessageBuilder
 	Reply(elements []*MessageElement) (*BaseMessage, error)
-	ReplyText(text string) (*BaseMessage, error)
+	ReplyText(a ...any) (*BaseMessage, error)
 }

@@ -63,6 +63,16 @@ func (m *MessageContext) Message() *botc.BaseMessage {
 	return m.base
 }
 
+func (m *MessageContext) SenderID() string {
+	switch m.messageType {
+	case botc.DirectMessage:
+		return fmt.Sprintf("%d", m.privateMsg.Sender.Uin)
+	case botc.GroupMessage:
+		return fmt.Sprintf("%d", m.groupMsg.Sender.Uin)
+	}
+	return ""
+}
+
 func (m *MessageContext) NewMessageBuilder() botc.MessageBuilder {
 	return &MessageBuilder{
 		service: m.service,
@@ -121,8 +131,8 @@ func (m *MessageContext) Reply(msg []*botc.MessageElement) (*botc.BaseMessage, e
 	return m.reply(TranslateMessageElement(m.service, msg))
 }
 
-func (m *MessageContext) ReplyText(text string) (*botc.BaseMessage, error) {
+func (m *MessageContext) ReplyText(a ...any) (*botc.BaseMessage, error) {
 	return m.reply([]LgrMessage.IMessageElement{
-		LgrMessage.NewText(text),
+		LgrMessage.NewText(fmt.Sprint(a...)),
 	})
 }

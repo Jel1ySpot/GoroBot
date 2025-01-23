@@ -35,7 +35,7 @@ func (s *Service) InitConic() error {
 		if err := c.WriteConfig(); err != nil {
 			return err
 		}
-		s.logger.Warning("Lagrange config file created.")
+		s.logger.Failed("Lagrange config file created.")
 		return fmt.Errorf("lagrange config file not exist")
 	}
 

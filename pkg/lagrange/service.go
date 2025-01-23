@@ -101,5 +101,5 @@ func (s *Service) saveSig() {
 		s.logger.Error("write sig.bin err: %s", err)
 		return
 	}
-	s.logger.Info("sig saved into %s", path.Join(s.ConfigPath, s.config.Account.SigPath))
+	s.logger.Success("sig saved into %s", path.Join(s.ConfigPath, s.config.Account.SigPath))
 }
