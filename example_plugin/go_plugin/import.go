@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// ListPlugins 检查 plugin/ 目录，并返回 .so 文件数组
+// ListPlugins 检查 plugin/ 目录，并返回包含插件名的数组
 func ListPlugins(pluginPath string) ([]string, error) {
 	// 定位到 plugin/ 目录
 	if _, err := os.Stat(pluginPath); os.IsNotExist(err) {
@@ -24,7 +24,7 @@ func ListPlugins(pluginPath string) ([]string, error) {
 		}
 		// 检查是否是 .so 文件
 		if !info.IsDir() && strings.HasSuffix(info.Name(), ".so") {
-			soFiles = append(soFiles, path)
+			soFiles = append(soFiles, strings.TrimRight(path, ".so"))
 		}
 		return nil
 	})

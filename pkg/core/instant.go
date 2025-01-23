@@ -67,8 +67,8 @@ func (i *Instant) GetLogger() logger.Inst {
 	return i.logger
 }
 
-func (i *Instant) GetOwner(protocol string) (id string, ok bool) {
-	id, ok = i.config.Owner[protocol]
+func (i *Instant) GetOwner(id string) (owner string, ok bool) {
+	owner, ok = i.config.Owner[id]
 	return
 }
 

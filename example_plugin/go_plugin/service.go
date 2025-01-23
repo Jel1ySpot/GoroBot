@@ -4,18 +4,18 @@ import (
 	"fmt"
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/logger"
-	"plugin"
 	"runtime"
 )
 
 const DefaultPluginPath = "plugin/"
 
 type Service struct {
-	bot    *GoroBot.Instant
+	grb    *GoroBot.Instant
 	logger logger.Inst
 
 	PluginPath string
-	services   []GoroBot.Service
+	pluginStat map[string]bool
+	services   map[string]GoroBot.Service
 }
 
 func (s *Service) Name() string {
@@ -25,6 +25,7 @@ func (s *Service) Name() string {
 func Create() *Service {
 	return &Service{
 		PluginPath: DefaultPluginPath,
+		pluginStat: make(map[string]bool),
 	}
 }
 
@@ -34,10 +35,8 @@ func RegularCreate() GoroBot.Service {
 }
 
 func (s *Service) Init(grb *GoroBot.Instant) error {
-	s.bot = grb
+	s.grb = grb
 	s.logger = grb.GetLogger()
-
-	log := s.logger
 
 	switch runtime.GOOS {
 	case "darwin":
@@ -47,54 +46,22 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 		return fmt.Errorf("%s is not a supported platform", runtime.GOOS)
 	}
 
-	plugins, err := ListPlugins(s.PluginPath)
-	if err != nil {
+	if err := s.LookupPlugins(); err != nil {
 		return err
 	}
 
-	log.Info("Start initializing Go plugins")
-
-	for _, file := range plugins {
-		p, err := plugin.Open(file)
-		if err != nil {
-			log.Failed("Failed to open plugin %s: %v", file, err)
-			continue
-		}
-
-		sym, err := p.Lookup("RegularCreate")
-		if err != nil {
-			log.Failed("Failed to find Create function in plugin %s: %v", file, err)
-			continue
-		}
-		createFunc, ok := sym.(func() GoroBot.Service)
-		if !ok {
-			log.Failed("Failed to type assert to RegularCreation in plugin %s: %T", file, sym)
-			continue
-		}
-
-		service := createFunc()
-
-		log.Debug("Initializing plugin service %s", service.Name())
-		if err := service.Init(grb); err != nil {
-			log.Failed("Failed to initialize plugin service %s: %v", service.Name(), err)
-			continue
-		}
-
-		s.services = append(s.services, service)
-		log.Success("Initialized plugin service %s success", service.Name())
-	}
+	s.InitPlugins()
 
 	return nil
 }
 
 func (s *Service) Release(grb *GoroBot.Instant) error {
-	for _, service := range s.services {
-		s.logger.Debug("Releasing plugin service %s", service.Name())
-		if err := service.Release(grb); err != nil {
-			s.logger.Error("Failed to release plugin service %s: %v", service.Name(), err)
-			continue
+	for name, stat := range s.pluginStat {
+		if stat {
+			if err := s.ReleasePlugin(name); err != nil {
+				s.logger.Failed(err.Error())
+			}
 		}
-		s.logger.Debug("Released plugin service %s success", service.Name())
 	}
 	return nil
 }
