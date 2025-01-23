@@ -33,8 +33,6 @@ func RegularCreate() GoroBot.Service {
 	return Create()
 }
 
-type RegularCreation func() GoroBot.Service
-
 func (s *Service) Init(grb *GoroBot.Instant) error {
 	s.bot = grb
 	s.logger = grb.GetLogger()
@@ -68,9 +66,10 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 			log.Failed("Failed to find Create function in plugin %s: %v", file, err)
 			continue
 		}
-		createFunc, ok := sym.(RegularCreation)
+		createFunc, ok := sym.(func() GoroBot.Service)
 		if !ok {
-			log.Failed("Failed to type assert to RegularCreation in plugin %s: %t", file, sym)
+			log.Failed("Failed to type assert to RegularCreation in plugin %s: %T", file, sym)
+			continue
 		}
 
 		service := createFunc()
