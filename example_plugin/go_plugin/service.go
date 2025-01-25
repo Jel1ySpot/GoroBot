@@ -26,6 +26,7 @@ func Create() *Service {
 	return &Service{
 		PluginPath: DefaultPluginPath,
 		pluginStat: make(map[string]bool),
+		services:   make(map[string]GoroBot.Service),
 	}
 }
 
@@ -51,6 +52,8 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 	}
 
 	s.InitPlugins()
+
+	s.initCmd()
 
 	return nil
 }

@@ -55,24 +55,24 @@ func (i *Instant) CommandEmit(cmd *command.Context) {
 	})
 }
 
-type MessageEventCallback func(ctx botc.MessageContext) error
+type MessageEventCallback func(ctx botc.MessageContext)
 
 func MessageEvent(callback MessageEventCallback) EventHandler {
 	return EventHandler{
 		Name: "message",
-		Callback: func(args ...interface{}) error {
-			return callback(args[0].(botc.MessageContext))
+		Callback: func(args ...interface{}) {
+			callback(args[0].(botc.MessageContext))
 		},
 	}
 }
 
-type CommandEventCallback func(ctx *command.Context) error
+type CommandEventCallback func(ctx *command.Context)
 
 func CommandEvent(callback CommandEventCallback) EventHandler {
 	return EventHandler{
 		Name: "command",
-		Callback: func(args ...interface{}) error {
-			return callback(args[0].(*command.Context))
+		Callback: func(args ...interface{}) {
+			callback(args[0].(*command.Context))
 		},
 	}
 }

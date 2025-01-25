@@ -35,9 +35,7 @@ func (r *Registry) emit(args ...interface{}) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for _, handler := range r.handlers {
-		if err := handler.call(args...); err != nil {
-			return err
-		}
+		handler.call(args...)
 	}
 	return nil
 }

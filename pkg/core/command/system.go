@@ -60,7 +60,7 @@ func (s *System) Emit(cmdCtx *Context) {
 
 func (r *Registry) Emit(cmdCtx *Context) { // 触发指令Reg
 	if err := r.cmd.Emit(cmdCtx); err != nil {
-		if r.cmd.Name == cmdCtx.Command {
+		if err.Error() != "unmatched command" {
 			_, _ = cmdCtx.ReplyText(err.Error())
 		}
 	}
@@ -82,7 +82,7 @@ func (i Inst) Emit(cmdCtx *Context) error {
 	}
 
 	if i.handler != nil {
-		i.handler(cmdCtx)
+		go i.handler(cmdCtx)
 	}
 
 	return nil

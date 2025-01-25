@@ -81,7 +81,7 @@ func (s *Service) ReleasePlugin(name string) error {
 	}
 	delete(s.services, name)
 	s.pluginStat[name] = false
-	s.logger.Debug("Released plugin service %s success", name)
+	s.logger.Success("Released plugin service %s success", name)
 	return nil
 }
 

@@ -25,9 +25,8 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 	s.bot = grb
 	s.logger = grb.GetLogger()
 
-	s.releaseFunc, _ = grb.On(GoroBot.MessageEvent(func(ctx botc.MessageContext) error {
+	s.releaseFunc, _ = grb.On(GoroBot.MessageEvent(func(ctx botc.MessageContext) {
 		s.log(ctx)
-		return nil
 	}))
 
 	return nil

@@ -1,6 +1,6 @@
 package event
 
-type Callback func(args ...interface{}) error
+type Callback func(args ...interface{})
 
 type Handler struct {
 	id          string
@@ -8,6 +8,6 @@ type Handler struct {
 	releaseFunc func()
 }
 
-func (h *Handler) call(args ...interface{}) error {
-	return h.callback(args...)
+func (h *Handler) call(args ...interface{}) {
+	go h.callback(args...)
 }

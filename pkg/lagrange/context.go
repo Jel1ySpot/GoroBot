@@ -13,7 +13,7 @@ type Context struct {
 }
 
 func (ctx *Context) ID() string {
-	return GenUserID(ctx.service.config.Account.Uin)
+	return fmt.Sprintf("%d", ctx.service.config.Account.Uin)
 }
 
 func (ctx *Context) Name() string {

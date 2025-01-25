@@ -16,12 +16,11 @@ func example_main() {
 	grb.Use(message_logger.Create())
 
 	var del func()
-	del, _ = grb.On(GoroBot.MessageEvent(func(ctx botc.MessageContext) error {
+	del, _ = grb.On(GoroBot.MessageEvent(func(ctx botc.MessageContext) {
 		if ctx.String() == "ping" {
 			_, _ = ctx.ReplyText("🏓")
 			del()
 		}
-		return nil
 	}))
 
 	if err := grb.Run(); err != nil {
