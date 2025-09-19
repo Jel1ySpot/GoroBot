@@ -2,15 +2,27 @@ package command
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	"regexp"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 var (
-	RegFormat         = regexp.MustCompile(`^(?P<name>\w+?)(?P<args>(?: [<\[]\w+?(?::\w+?)?[>\]](?:=\w+?)? ?)*)$`)
+	// RegFormat 用于匹配命令格式
+	// 格式: commandName <required_arg:type> [optional_arg:type]
+	// 例如: test <user:string> [count:int=1]
+	RegFormat = regexp.MustCompile(`^(?P<name>\w+?)(?P<args>(?: [<\[]\w+?(?::\w+?)?[>\]](?:=\w+?)? ?)*)$`)
+
+	// ArgumentRegFormat 用于匹配参数格式
+	// 必选参数格式: <param_name:param_type>
+	// 可选参数格式: [param_name:param_type=default_value]
 	ArgumentRegFormat = regexp.MustCompile(`(?:<(?P<required_name>\w+?)(?::(?P<required_type>\w+?))?>|\[(?P<optional_name>\w+?)(?::(?P<optional_type>\w+?))?\])(?:=(?P<default>\w+))?`)
-	OptionRegFormat   = regexp.MustCompile(`^-(?P<short>\w+?) \[(?P<name>\w+?)(?::(?P<type>\w+?))?\](?:=(?P<default>\w+?))?$`)
+
+	// OptionRegFormat 用于匹配选项格式
+	// 格式: -s [name:type=default]
+	// 例如: -u [user:string]
+	OptionRegFormat = regexp.MustCompile(`^-(?P<short>\w+?) \[(?P<name>\w+?)(?::(?P<type>\w+?))?\](?:=(?P<default>\w+?))?$`)
 )
 
 type FormatBuilder struct {
