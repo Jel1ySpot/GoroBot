@@ -47,12 +47,13 @@ func (i *Instant) SaveRemoteResource(resourceURL string) (*Resource, error) {
 	filePath := path.Join(resourceDirPath, fileName)
 
 	if _, err := os.Stat(resourceDirPath); os.IsNotExist(err) {
-		if err := os.Mkdir(resourceDirPath, os.ModePerm); err != nil {
+		if err := os.MkdirAll(resourceDirPath, os.ModePerm); err != nil {
 			return nil, fmt.Errorf("error creating resource dir %s: %v", resourceDirPath, err)
 		}
 	}
 
 	if err := os.WriteFile(filePath, data, 0644); err != nil {
+		return nil, fmt.Errorf("failed to write resource file %s: %v", filePath, err)
 	}
 
 	resource := Resource{
@@ -79,7 +80,13 @@ func (i *Instant) SaveResourceData(data []byte, ext string) (string, error) {
 		return id, nil
 	}
 	currentTime := time.Now()
-	resourceFilePath := path.Join("resources", currentTime.Format("2006/01.02"), id+"."+ext)
+	resourceDirPath := path.Join("resources", currentTime.Format("2006/01.02"))
+	resourceFilePath := path.Join(resourceDirPath, id+"."+ext)
+
+	// Create directory structure if it doesn't exist
+	if err := os.MkdirAll(resourceDirPath, 0755); err != nil {
+		return "", fmt.Errorf("failed to create resource directory %s: %v", resourceDirPath, err)
+	}
 
 	resource := Resource{
 		ID:         id,
@@ -87,8 +94,8 @@ func (i *Instant) SaveResourceData(data []byte, ext string) (string, error) {
 		Downloaded: currentTime,
 	}
 
-	if err := os.WriteFile(resourceFilePath, data, 0600); err != nil {
-		return "", err
+	if err := os.WriteFile(resourceFilePath, data, 0644); err != nil {
+		return "", fmt.Errorf("failed to write resource file %s: %v", resourceFilePath, err)
 	}
 
 	if err := i.saveResourceIndex(resource); err != nil {
@@ -133,6 +140,12 @@ func (i *Instant) ResourceExists(resourceID string) bool {
 	if ok {
 		return true
 	}
+
+	// Only check database if it exists
+	if !i.DatabaseExist() {
+		return false
+	}
+
 	_, err := i.GetResource(resourceID)
 	if err == nil {
 		return true
@@ -142,6 +155,11 @@ func (i *Instant) ResourceExists(resourceID string) bool {
 
 // GetResource 根据资源ID获取资源信息
 func (i *Instant) GetResource(resourceID string) (Resource, error) {
+	// Check if database is available
+	if !i.DatabaseExist() {
+		return Resource{}, fmt.Errorf("database not available")
+	}
+
 	// 假设数据库连接对象为 i.Database()
 	db := i.Database()
 
