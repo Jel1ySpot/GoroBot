@@ -4,168 +4,126 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-
-	"github.com/google/uuid"
 )
 
-var (
-	// RegFormat 用于匹配命令格式
-	// 格式: commandName <required_arg:type> [optional_arg:type]
-	// 例如: test <user:string> [count:int=1]
-	RegFormat = regexp.MustCompile(`^(?P<name>\w+?)(?P<args>(?: [<\[]\w+?(?::\w+?)?[>\]](?:=\w+?)? ?)*)$`)
-
-	// ArgumentRegFormat 用于匹配参数格式
-	// 必选参数格式: <param_name:param_type>
-	// 可选参数格式: [param_name:param_type=default_value]
-	ArgumentRegFormat = regexp.MustCompile(`(?:<(?P<required_name>\w+?)(?::(?P<required_type>\w+?))?>|\[(?P<optional_name>\w+?)(?::(?P<optional_type>\w+?))?\])(?:=(?P<default>\w+))?`)
-
-	// OptionRegFormat 用于匹配选项格式
-	// 格式: -s [name:type=default]
-	// 例如: -u [user:string]
-	OptionRegFormat = regexp.MustCompile(`^-(?P<short>\w+?) \[(?P<name>\w+?)(?::(?P<type>\w+?))?\](?:=(?P<default>\w+?))?$`)
-)
+type alias struct {
+	pattern   *regexp.Regexp
+	transform func(*Context) *Context
+}
 
 type FormatBuilder struct {
-	inst     Inst
-	callback func(Inst) func()
+	system   *System
+	registry *Registry
+	parent   *FormatBuilder
 	err      error
 }
 
-func NewCommandFormatBuilder(format string, callback func(Inst) func()) *FormatBuilder {
-	matches := RegFormat.FindStringSubmatch(format)
-
-	if matches == nil {
-		return &FormatBuilder{
-			err: fmt.Errorf("invalid format \"%s\"", format),
-		}
-	}
-
-	var (
-		nameIndex = RegFormat.SubexpIndex("name")
-		argsIndex = RegFormat.SubexpIndex("args")
-	)
-
-	builder := FormatBuilder{
-		inst: Inst{
-			Name:  matches[nameIndex],
-			Alias: make(map[string]map[string]string),
-			Subs:  make(map[string]Inst),
+func NewCommandFormatBuilder(format string, system *System) *FormatBuilder {
+	schema, err := parseFormat(format)
+	return &FormatBuilder{
+		system: system,
+		registry: &Registry{
+			Schema: *schema,
 		},
-		callback: callback,
+		err: err,
 	}
-	return builder.Arguments(matches[argsIndex])
 }
 
-func (b *FormatBuilder) Arguments(args string) *FormatBuilder {
-	args = strings.TrimSpace(args)
-	arg := ArgumentRegFormat.FindString(args)
-	if arg == "" {
-		return b
+func (f *FormatBuilder) SubCommand(format string) *FormatBuilder {
+	schema, err := parseFormat(format)
+	f.registry.SubRegistries = append(f.registry.SubRegistries, Registry{
+		Schema: *schema,
+	})
+	child := &FormatBuilder{
+		system:   f.system,
+		registry: &f.registry.SubRegistries[len(f.registry.SubRegistries)-1],
+		parent:   f,
+		err:      err,
 	}
 
-	matches := ArgumentRegFormat.FindStringSubmatch(arg)
-
-	var (
-		requiredNameIndex = ArgumentRegFormat.SubexpIndex("required_name")
-		requiredTypeIndex = ArgumentRegFormat.SubexpIndex("required_type")
-		optionalNameIndex = ArgumentRegFormat.SubexpIndex("optional_name")
-		optionalTypeIndex = ArgumentRegFormat.SubexpIndex("optional_type")
-		defaultIndex      = ArgumentRegFormat.SubexpIndex("default")
-	)
-
-	switch arg[0] {
-	case '<':
-		argType, err := ParseArgType(matches[requiredTypeIndex])
-		if err != nil {
-			b.err = fmt.Errorf("invalid argument type \"%s\"", matches[requiredTypeIndex])
-			return b
-		}
-		b.inst.Arguments = append(b.inst.Arguments, Argument{
-			Type:     argType,
-			Required: true,
-			Name:     matches[requiredNameIndex],
-			Default:  matches[defaultIndex],
-		})
-	case '[':
-		argType, err := ParseArgType(matches[optionalTypeIndex])
-		if err != nil {
-			b.err = fmt.Errorf("invalid argument type \"%s\"", matches[optionalTypeIndex])
-			return b
-		}
-		b.inst.Arguments = append(b.inst.Arguments, Argument{
-			Type:     argType,
-			Required: false,
-			Name:     matches[optionalNameIndex],
-			Default:  matches[defaultIndex],
-		})
+	if f.err != nil && child.err == nil {
+		child.err = f.err
 	}
 
-	return b.Arguments(args[len(arg):])
+	return child
 }
 
-func (b *FormatBuilder) Option(opt string) *FormatBuilder {
-	if b.err != nil {
-		return b
+func (f *FormatBuilder) Action(handler func(ctx *Context)) *FormatBuilder {
+	f.registry.Handler = func(ctx *Context) error {
+		handler(ctx)
+		return nil
 	}
+	return f
+}
 
-	matches := OptionRegFormat.FindStringSubmatch(opt)
-	if matches == nil {
-		b.err = fmt.Errorf("invalid option \"%s\"", opt)
-		return b
+func (f *FormatBuilder) Alias(pattern string, transform func(*Context) *Context) *FormatBuilder {
+	if f.err != nil {
+		return f
 	}
-
-	var (
-		shortIndex   = OptionRegFormat.SubexpIndex("short")
-		nameIndex    = OptionRegFormat.SubexpIndex("name")
-		typeIndex    = OptionRegFormat.SubexpIndex("type")
-		defaultIndex = OptionRegFormat.SubexpIndex("default")
-	)
-
-	argType, err := ParseArgType(matches[typeIndex])
+	re, err := regexp.Compile(pattern)
 	if err != nil {
-		b.err = fmt.Errorf("invalid option type \"%s\"", matches[typeIndex])
-		return b
+		f.err = err
+		return f
 	}
 
-	b.inst.Options = append(b.inst.Options, Option{
-		Type:    argType,
-		Name:    matches[nameIndex],
-		Short:   matches[shortIndex],
-		Default: matches[defaultIndex],
+	f.registry.Aliases = append(f.registry.Aliases, alias{
+		pattern:   re,
+		transform: transform,
 	})
 
-	return b
+	return f
 }
 
-func (b *FormatBuilder) Alias(reg string, option map[string]string) *FormatBuilder {
-	b.inst.Alias[reg] = option
-	return b
-}
-
-func (b *FormatBuilder) Action(handler func(ctx *Context)) *FormatBuilder {
-	b.inst.handler = handler
-	return b
-}
-
-// SubCommand 创建子命令
-func (b *FormatBuilder) SubCommand(format string) *FormatBuilder {
-	if b.err != nil {
-		return b
+func (f *FormatBuilder) Build() (func(), error) {
+	if f.err != nil {
+		return func() {}, f.err
 	}
-	id := uuid.New().String()
-	return NewCommandFormatBuilder(format, func(cmd Inst) func() {
-		b.inst.Subs[id] = cmd
-		return func() {
-			delete(b.inst.Subs, id)
+
+	if f.parent != nil {
+		return func() {}, nil
+	}
+
+	return f.system.Register(*f.registry), nil
+}
+
+func parseFormat(format string) (*Schema, error) {
+	parts := strings.Fields(format)
+	if len(parts) == 0 {
+		return nil, fmt.Errorf("invalid command format")
+	}
+
+	schema := Schema{
+		Name: parts[0],
+	}
+
+	for _, part := range parts[1:] {
+		if strings.HasPrefix(part, "<") && strings.HasSuffix(part, ">") {
+			content := strings.TrimSuffix(strings.TrimPrefix(part, "<"), ">")
+			name := content
+			inputType := String
+
+			if strings.Contains(content, ":") {
+				s := strings.SplitN(content, ":", 2)
+				name = s[0]
+				inputType = normalizeInputType(InputType(s[1]))
+			}
+
+			schema.AddArgument(name, inputType, "")
 		}
-	})
-}
-
-// Build 构造命令
-func (b *FormatBuilder) Build() (func(), error) {
-	if b.err != nil {
-		return nil, b.err
 	}
 
-	return b.callback(b.inst), nil
+	return &schema, nil
+}
+
+func normalizeInputType(t InputType) InputType {
+	switch strings.ToLower(string(t)) {
+	case "", "string", "text":
+		return String
+	case "bool", "boolean":
+		return Boolean
+	case "number", "int", "integer", "float", "double":
+		return Number
+	default:
+		return t
+	}
 }
