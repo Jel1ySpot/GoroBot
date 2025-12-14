@@ -27,19 +27,19 @@ type Config struct {
 		Port        int    `json:"port"`
 		AccessToken string `json:"access_token"`
 		Path        string `json:"path"`
-	} `json:"websocket"`
+	} `json:"ws"`
 
 	// Reverse WebSocket configuration
 	ReverseWebSocket struct {
 		Host              string `json:"host"`
 		Port              int    `json:"port"`
 		AccessToken       string `json:"access_token"`
-		APIPath           string `json:"api_path"`
-		EventPath         string `json:"event_path"`
+		APIPath           string `json:"api_path,omitempty"`
+		EventPath         string `json:"event_path,omitempty"`
 		UniversalPath     string `json:"universal_path"`
 		UseUniversal      bool   `json:"use_universal"`
 		ReconnectInterval int    `json:"reconnect_interval"` // milliseconds
-	} `json:"reverse_websocket"`
+	} `json:"ws_reverse"`
 
 	// Message format: "string" or "array"
 	MessageFormat string `json:"message_format"`
@@ -73,7 +73,7 @@ var defaultConfig = Config{
 		Timeout     int    `json:"timeout"`
 	}{
 		Host:        "127.0.0.1",
-		Port:        5700,
+		Port:        8080,
 		AccessToken: "",
 		PostURL:     "http://127.0.0.1:3000",
 		Secret:      "",
@@ -86,7 +86,7 @@ var defaultConfig = Config{
 		Path        string `json:"path"`
 	}{
 		Host:        "127.0.0.1",
-		Port:        6700,
+		Port:        3001,
 		AccessToken: "",
 		Path:        "/",
 	},
@@ -94,20 +94,18 @@ var defaultConfig = Config{
 		Host              string `json:"host"`
 		Port              int    `json:"port"`
 		AccessToken       string `json:"access_token"`
-		APIPath           string `json:"api_path"`
-		EventPath         string `json:"event_path"`
+		APIPath           string `json:"api_path,omitempty"`
+		EventPath         string `json:"event_path,omitempty"`
 		UniversalPath     string `json:"universal_path"`
 		UseUniversal      bool   `json:"use_universal"`
 		ReconnectInterval int    `json:"reconnect_interval"`
 	}{
 		Host:              "127.0.0.1",
-		Port:              8080,
+		Port:              8082,
 		AccessToken:       "",
-		APIPath:           "/ws/api",
-		EventPath:         "/ws/event",
-		UniversalPath:     "/ws",
-		UseUniversal:      false,
-		ReconnectInterval: 3000,
+		UniversalPath:     "/",
+		UseUniversal:      true,
+		ReconnectInterval: 30000,
 	},
 	MessageFormat: "array",
 	Heartbeat: struct {
@@ -115,7 +113,7 @@ var defaultConfig = Config{
 		Interval int  `json:"interval"`
 	}{
 		Enable:   false,
-		Interval: 15000,
+		Interval: 30000,
 	},
 	RateLimit: struct {
 		Enable   bool `json:"enable"`
