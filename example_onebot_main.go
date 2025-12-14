@@ -10,10 +10,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func main() {
-	onebot_example()
-}
-
 func onebot_example() {
 	grb := GoroBot.Create()
 
