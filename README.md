@@ -5,7 +5,7 @@ Go语言编写的跨平台聊天机器人框架
 
 ## 支持平台
 - [x] QQ ([pkg/lagrange](https://github.com/Jel1ySpot/GoroBot/tree/master/pkg/lagrange))
-- [ ] OneBot
+- [x] OneBot
 - [x] QQ Official ([pkg/qbot](https://github.com/Jel1ySpot/GoroBot/tree/master/pkg/qbot))
 - [ ] Telegram
 
@@ -26,8 +26,14 @@ Go语言编写的跨平台聊天机器人框架
 ## TODO
 欢迎向本项目提交 Issue
 
-### Feature
+### Roadmap
 - [x] 完善指令系统
 
+### Official Plugins
+- [x] `ping`: bot 还在线吗？ping 一下看看
+- [x] `message_logger`: 在控制台输出消息日志
+- [x] `go_plugin`: 支持 go 风格热插拔式插件
+
 ### Bugs
+- [ ] Onebot 适配器未稳定
 
