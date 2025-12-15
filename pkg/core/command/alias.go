@@ -7,7 +7,7 @@ func (r *Registry) CheckAlias(ctx *Context) {
 			if alias.transform != nil {
 				target = alias.transform(target)
 			}
-			_ = r.handle(target)
+			_ = r.Handler(target)
 			return
 		}
 	}

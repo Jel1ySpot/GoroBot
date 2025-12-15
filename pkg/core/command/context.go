@@ -14,7 +14,7 @@ type Context struct {
 	raw       string
 	Commands  []string
 	Arguments []string
-	Args      map[string]string
+	KvArgs    map[string]string
 	Options   map[string]string
 }
 
@@ -29,7 +29,7 @@ func NewCommandContext(msg botc.MessageContext, text string) *Context {
 		argQueue:       tokens,
 		raw:            text,
 		Arguments:      []string{},
-		Args:           make(map[string]string),
+		KvArgs:         make(map[string]string),
 		Options:        make(map[string]string),
 	}
 }
@@ -39,9 +39,9 @@ func (ctx *Context) Clone() *Context {
 	commands := append([]string(nil), ctx.Commands...)
 	arguments := append([]string(nil), ctx.Arguments...)
 
-	args := make(map[string]string, len(ctx.Args))
-	for k, v := range ctx.Args {
-		args[k] = v
+	kvArgs := make(map[string]string, len(ctx.KvArgs))
+	for k, v := range ctx.KvArgs {
+		kvArgs[k] = v
 	}
 
 	options := make(map[string]string, len(ctx.Options))
@@ -55,7 +55,7 @@ func (ctx *Context) Clone() *Context {
 		raw:            ctx.raw,
 		Commands:       commands,
 		Arguments:      arguments,
-		Args:           args,
+		KvArgs:         kvArgs,
 		Options:        options,
 	}
 }
@@ -63,9 +63,6 @@ func (ctx *Context) Clone() *Context {
 func (ctx *Context) processTokens(schema *Schema) error {
 	ctx.Commands = nil
 	ctx.Arguments = nil
-	for k := range ctx.Args {
-		delete(ctx.Args, k)
-	}
 	for k := range ctx.Options {
 		delete(ctx.Options, k)
 	}
@@ -130,7 +127,7 @@ func (ctx *Context) processTokens(schema *Schema) error {
 			if !CheckInputType(token, arg.Type) {
 				return fmt.Errorf("argument '%s' expected type '%s', received '%s'", arg.Name, arg.Type, token)
 			}
-			ctx.Args[arg.Name] = token
+			ctx.KvArgs[arg.Name] = token
 		}
 		argIndex++
 		queue = queue[1:]

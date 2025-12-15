@@ -38,13 +38,28 @@ func (f *FormatBuilder) SubCommand(name string) *FormatBuilder {
 	return child
 }
 
-func (f *FormatBuilder) Argument(name string, required bool, help string) *FormatBuilder {
+func (f *FormatBuilder) Option(name string, shortName string, inputType InputType, required bool, Default string, help string) *FormatBuilder {
+	if f.err != nil {
+		return f
+	}
+	f.registry.Schema.Options = append(f.registry.Schema.Options, SchemaOption{
+		Name:      name,
+		ShortName: shortName,
+		Type:      inputType,
+		Help:      help,
+		Required:  required,
+		Default:   Default,
+	})
+	return f
+}
+
+func (f *FormatBuilder) Argument(name string, inputType InputType, required bool, help string) *FormatBuilder {
 	if f.err != nil {
 		return f
 	}
 	f.registry.Schema.Arguments = append(f.registry.Schema.Arguments, SchemaArgument{
 		Name:     name,
-		Type:     String,
+		Type:     inputType,
 		Help:     help,
 		Required: required,
 	})

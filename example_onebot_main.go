@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/Jel1ySpot/GoroBot/example_plugin/dice"
 	"github.com/Jel1ySpot/GoroBot/example_plugin/message_logger"
 	"github.com/Jel1ySpot/GoroBot/example_plugin/ping"
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
@@ -24,6 +25,7 @@ func onebot_example() {
 	grb.Use(onebot)
 	grb.Use(message_logger.Create())
 	grb.Use(ping.Create())
+	grb.Use(dice.Create())
 
 	// Example: Echo bot that responds to "ping" with "pong"
 	var del func()
@@ -36,9 +38,9 @@ func onebot_example() {
 
 	// Example: Command-style handler using the correct API
 	_command_del, _ := grb.Command("echo").
-		Argument("content", true, "").
+		Argument("content", command.String, true, "").
 		Action(func(ctx *command.Context) {
-			ctx.ReplyText(ctx.Args["content"])
+			ctx.ReplyText(ctx.KvArgs["content"])
 		}).Build()
 
 	// Keep the command handler reference to avoid unused variable error
