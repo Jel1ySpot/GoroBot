@@ -370,10 +370,9 @@ func (s *Service) parseCQCodeMessage(message string) ([]*botc.MessageElement, st
 			}
 		}
 
-		// Add remaining text
+		// Add remaining text if it's not empty after the CQ code
 		if remaining != "" {
-			text := unescapeCQCode(remaining)
-			b.Append(botc.TextElement, text, "")
+			b.Append(botc.TextElement, unescapeCQCode(remaining), "")
 		}
 	}
 

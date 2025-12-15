@@ -427,5 +427,3 @@ func (s *Service) getCachedFriendInfo(userID int64) (Friend, bool) {
 	friend, exists := s.cache.friendList[userID]
 	return friend, exists
 }
-
-}
