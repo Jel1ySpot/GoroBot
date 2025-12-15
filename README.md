@@ -35,5 +35,5 @@ Go语言编写的跨平台聊天机器人框架
 - [x] `go_plugin`: 支持 go 风格热插拔式插件
 
 ### Bugs
-- [ ] Onebot 适配器未稳定（只有反向Websocket工作正常）
+- [ ] Onebot 适配器未稳定（http连接未完善）
 
