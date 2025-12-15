@@ -163,7 +163,7 @@ func (mc *MessageContext) Reply(elements []*botc.MessageElement) (*botc.BaseMess
 
 // Event handling registration
 func (s *Service) registerEventHandlers() {
-	// This method sets up the event handlers for different communication modes
+	// This method sets up the event handlers for different connection modes
 	// The actual event processing is handled in the connection-specific methods
 }
 

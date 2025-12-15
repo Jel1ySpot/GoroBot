@@ -41,21 +41,21 @@ type Group struct {
 }
 
 type GroupMember struct {
-	GroupID           int64  `json:"group_id"`
-	UserID            int64  `json:"user_id"`
-	Nickname          string `json:"nickname"`
-	Card              string `json:"card"`
-	Sex               string `json:"sex"`
-	Age               int32  `json:"age"`
-	Area              string `json:"area"`
-	JoinTime          int32  `json:"join_time"`
-	LastSentTime      int32  `json:"last_sent_time"`
-	Level             string `json:"level"`
-	Role              string `json:"role"`
-	Unfriendly        bool   `json:"unfriendly"`
-	Title             string `json:"title"`
-	TitleExpireTime   int32  `json:"title_expire_time"`
-	CardChangeable    bool   `json:"card_changeable"`
+	GroupID         int64  `json:"group_id"`
+	UserID          int64  `json:"user_id"`
+	Nickname        string `json:"nickname"`
+	Card            string `json:"card"`
+	Sex             string `json:"sex"`
+	Age             int32  `json:"age"`
+	Area            string `json:"area"`
+	JoinTime        int32  `json:"join_time"`
+	LastSentTime    int32  `json:"last_sent_time"`
+	Level           string `json:"level"`
+	Role            string `json:"role"`
+	Unfriendly      bool   `json:"unfriendly"`
+	Title           string `json:"title"`
+	TitleExpireTime int32  `json:"title_expire_time"`
+	CardChangeable  bool   `json:"card_changeable"`
 }
 
 type Status struct {
@@ -72,7 +72,7 @@ func (s *Service) makeAPIRequest(action string, params map[string]interface{}) (
 	case "ws", "ws_reverse":
 		return s.makeWebSocketRequest(action, params)
 	default:
-		return nil, fmt.Errorf("unsupported communication mode for API calls: %s", s.config.Mode)
+		return nil, fmt.Errorf("unsupported connection mode for API calls: %s", s.config.Mode)
 	}
 }
 
@@ -365,9 +365,9 @@ func (s *Service) fetchGroupList() ([]Group, error) {
 
 func (s *Service) getGroupMemberInfo(groupID, userID int64, noCache bool) (*GroupMember, error) {
 	params := map[string]interface{}{
-		"group_id":  groupID,
-		"user_id":   userID,
-		"no_cache":  noCache,
+		"group_id": groupID,
+		"user_id":  userID,
+		"no_cache": noCache,
 	}
 
 	resp, err := s.makeAPIRequest("get_group_member_info", params)

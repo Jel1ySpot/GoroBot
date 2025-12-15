@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	DefaultConfigPath = "conf/onebot/"
+	DefaultConfigPath   = "conf/onebot/"
 	CacheUpdateInterval = 5 * time.Minute // Cache refresh interval
 )
 
@@ -153,7 +153,7 @@ func (s *Service) connect() error {
 	case "ws_reverse":
 		return s.connectReverseWebSocket()
 	default:
-		return fmt.Errorf("unsupported communication mode: %s (supported: http, http_post, ws, ws_reverse)", s.config.Mode)
+		return fmt.Errorf("unsupported connection mode: %s (supported: http, http_post, ws, ws_reverse)", s.config.Mode)
 	}
 }
 
@@ -219,7 +219,7 @@ func (s *Service) connectionMonitor() {
 }
 
 func (s *Service) ping() error {
-	// Implementation depends on the communication mode
+	// Implementation depends on the connection mode
 	switch s.config.Mode {
 	case "http":
 		_, err := s.getStatus()

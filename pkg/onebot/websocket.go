@@ -19,39 +19,16 @@ func (s *Service) startWebSocketServer() error {
 	mux := http.NewServeMux()
 
 	// Handle API connections
-	if !s.config.ReverseWebSocket.UseUniversal {
-		mux.HandleFunc(s.config.ReverseWebSocket.APIPath, func(w http.ResponseWriter, r *http.Request) {
-			conn, err := upgrader.Upgrade(w, r, nil)
-			if err != nil {
-				s.logger.Error("Failed to upgrade API WebSocket: %v", err)
-				return
-			}
-			s.apiConn = conn
-			s.handleAPIWebSocket(conn)
-		})
-
-		mux.HandleFunc(s.config.ReverseWebSocket.EventPath, func(w http.ResponseWriter, r *http.Request) {
-			conn, err := upgrader.Upgrade(w, r, nil)
-			if err != nil {
-				s.logger.Error("Failed to upgrade Event WebSocket: %v", err)
-				return
-			}
-			s.eventConn = conn
-			s.handleEventWebSocket(conn)
-		})
-	} else {
-		// Universal WebSocket handling both API and events
-		mux.HandleFunc(s.config.ReverseWebSocket.UniversalPath, func(w http.ResponseWriter, r *http.Request) {
-			conn, err := upgrader.Upgrade(w, r, nil)
-			if err != nil {
-				s.logger.Error("Failed to upgrade Universal WebSocket: %v", err)
-				return
-			}
-			s.apiConn = conn
-			s.eventConn = conn
-			s.handleUniversalWebSocket(conn)
-		})
-	}
+	mux.HandleFunc(s.config.ReverseWebSocket.Path, func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			s.logger.Error("Failed to upgrade WebSocket: %v", err)
+			return
+		}
+		s.apiConn = conn
+		s.eventConn = conn
+		s.handleUniversalWebSocket(conn)
+	})
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", s.config.ReverseWebSocket.Host, s.config.ReverseWebSocket.Port),
@@ -72,10 +49,9 @@ func (s *Service) startWebSocketServer() error {
 func (s *Service) connectToWebSocketServer() error {
 	host := s.config.WebSocket.Host
 	port := s.config.WebSocket.Port
-	path := s.config.WebSocket.Path
 
 	// Connect to API endpoint
-	apiURL := fmt.Sprintf("ws://%s:%d%s/api", host, port, path)
+	apiURL := fmt.Sprintf("ws://%s:%d/api", host, port)
 	s.logger.Info("Connecting to OneBot WebSocket API: %s", apiURL)
 
 	headers := make(http.Header)
@@ -94,7 +70,7 @@ func (s *Service) connectToWebSocketServer() error {
 	s.logger.Success("Connected to OneBot API WebSocket")
 
 	// Connect to Event endpoint
-	eventURL := fmt.Sprintf("ws://%s:%d%s/event", host, port, path)
+	eventURL := fmt.Sprintf("ws://%s:%d/event", host, port)
 	s.logger.Info("Connecting to OneBot WebSocket Event: %s", eventURL)
 
 	eventConn, resp, err := s.wsDialer.Dial(eventURL, headers)

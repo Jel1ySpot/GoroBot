@@ -8,123 +8,67 @@ import (
 )
 
 type Config struct {
-	// Communication mode: "http", "http_post", "ws", "ws_reverse"
+	// connection mode: "http", "http_post", "ws", "ws_reverse"
 	Mode string `json:"mode"`
 
 	// HTTP configuration
-	HTTP struct {
+	HTTP *struct {
 		Host        string `json:"host"`
 		Port        int    `json:"port"`
 		AccessToken string `json:"access_token"`
 		PostURL     string `json:"post_url"`
 		Secret      string `json:"secret"`
-		Timeout     int    `json:"timeout"` // seconds
-	} `json:"http"`
+		Timeout     int    `json:"timeout,omitempty"` // seconds
+	} `json:"http,omitempty"`
 
 	// WebSocket configuration
-	WebSocket struct {
+	WebSocket *struct {
 		Host        string `json:"host"`
 		Port        int    `json:"port"`
-		AccessToken string `json:"access_token"`
-		Path        string `json:"path"`
-	} `json:"ws"`
+		AccessToken string `json:"access_token,omitempty"`
+	} `json:"ws,omitempty"`
 
 	// Reverse WebSocket configuration
-	ReverseWebSocket struct {
+	ReverseWebSocket *struct {
 		Host              string `json:"host"`
 		Port              int    `json:"port"`
-		AccessToken       string `json:"access_token"`
-		APIPath           string `json:"api_path,omitempty"`
-		EventPath         string `json:"event_path,omitempty"`
-		UniversalPath     string `json:"universal_path"`
-		UseUniversal      bool   `json:"use_universal"`
-		ReconnectInterval int    `json:"reconnect_interval"` // milliseconds
-	} `json:"ws_reverse"`
+		AccessToken       string `json:"access_token,omitempty"`
+		Path              string `json:"path,omitempty"`
+		ReconnectInterval int    `json:"reconnect_interval,omitempty"` // milliseconds
+	} `json:"ws_reverse,omitempty"`
 
 	// Message format: "string" or "array"
-	MessageFormat string `json:"message_format"`
+	MessageFormat string `json:"message_format,omitempty"`
 
 	// Whether to enable heartbeat
-	Heartbeat struct {
+	Heartbeat *struct {
 		Enable   bool `json:"enable"`
-		Interval int  `json:"interval"` // milliseconds
-	} `json:"heartbeat"`
+		Interval int  `json:"interval,omitempty"` // milliseconds
+	} `json:"heartbeat,omitempty"`
 
 	// API rate limiting
-	RateLimit struct {
+	RateLimit *struct {
 		Enable   bool `json:"enable"`
 		Interval int  `json:"interval"` // milliseconds
-	} `json:"rate_limit"`
+	} `json:"rate_limit,omitempty"`
 
 	// Bot behavior settings
-	IgnoreSelf    bool   `json:"ignore_self"`
-	Debug         bool   `json:"debug"`
-	CommandPrefix string `json:"command_prefix"`
+	IgnoreSelf    bool   `json:"ignore_self,omitempty"`
+	Debug         bool   `json:"debug,omitempty"`
+	CommandPrefix string `json:"command_prefix,omitempty"`
 }
 
 var defaultConfig = Config{
-	Mode: "http",
-	HTTP: struct {
-		Host        string `json:"host"`
-		Port        int    `json:"port"`
-		AccessToken string `json:"access_token"`
-		PostURL     string `json:"post_url"`
-		Secret      string `json:"secret"`
-		Timeout     int    `json:"timeout"`
-	}{
-		Host:        "127.0.0.1",
-		Port:        8080,
-		AccessToken: "",
-		PostURL:     "http://127.0.0.1:3000",
-		Secret:      "",
-		Timeout:     30,
-	},
-	WebSocket: struct {
-		Host        string `json:"host"`
-		Port        int    `json:"port"`
-		AccessToken string `json:"access_token"`
-		Path        string `json:"path"`
-	}{
-		Host:        "127.0.0.1",
-		Port:        3001,
-		AccessToken: "",
-		Path:        "/",
-	},
-	ReverseWebSocket: struct {
-		Host              string `json:"host"`
-		Port              int    `json:"port"`
-		AccessToken       string `json:"access_token"`
-		APIPath           string `json:"api_path,omitempty"`
-		EventPath         string `json:"event_path,omitempty"`
-		UniversalPath     string `json:"universal_path"`
-		UseUniversal      bool   `json:"use_universal"`
-		ReconnectInterval int    `json:"reconnect_interval"`
-	}{
-		Host:              "127.0.0.1",
-		Port:              8082,
-		AccessToken:       "",
-		UniversalPath:     "/",
-		UseUniversal:      true,
-		ReconnectInterval: 30000,
-	},
-	MessageFormat: "array",
-	Heartbeat: struct {
-		Enable   bool `json:"enable"`
-		Interval int  `json:"interval"`
-	}{
-		Enable:   false,
-		Interval: 30000,
-	},
-	RateLimit: struct {
-		Enable   bool `json:"enable"`
-		Interval int  `json:"interval"`
-	}{
-		Enable:   false,
-		Interval: 500,
-	},
-	IgnoreSelf:    true,
-	Debug:         false,
-	CommandPrefix: "/",
+	Mode:             "",
+	HTTP:             nil,
+	WebSocket:        nil,
+	ReverseWebSocket: nil,
+	MessageFormat:    "",
+	Heartbeat:        nil,
+	RateLimit:        nil,
+	IgnoreSelf:       true,
+	Debug:            false,
+	CommandPrefix:    "",
 }
 
 func (s *Service) initConfig() error {
@@ -140,7 +84,6 @@ func (s *Service) initConfig() error {
 			return fmt.Errorf("failed to create config directory: %v", err)
 		}
 
-		// Set default config
 		s.config = defaultConfig
 
 		if err := c.WriteConfig(); err != nil {
@@ -149,11 +92,8 @@ func (s *Service) initConfig() error {
 
 		s.logger.Warning("OneBot config file created at %s with default settings", configPath)
 		s.logger.Warning("Please configure the OneBot connection settings in %s and restart", configPath)
-		s.logger.Info("Available modes: http, http_post, ws, ws_reverse")
-		s.logger.Info("Example HTTP mode: set host and port for OneBot server")
-		s.logger.Info("Example WebSocket: set host and port for OneBot WebSocket server")
+		s.logger.Info("Available modes: http, ws, ws_reverse")
 
-		// Don't return error immediately, let user configure first
 		return fmt.Errorf("OneBot configuration required - please edit %s and restart", configPath)
 	}
 
@@ -165,8 +105,6 @@ func (s *Service) initConfig() error {
 	if err := s.validateConfig(); err != nil {
 		s.logger.Error("OneBot configuration validation failed: %v", err)
 		s.logger.Info("Please check your configuration in %s", configPath)
-		s.logger.Info("Available communication modes: http, http_post, ws, ws_reverse")
-		s.logger.Info("Available message formats: string, array")
 		return fmt.Errorf("OneBot configuration invalid: %v", err)
 	}
 
@@ -175,8 +113,7 @@ func (s *Service) initConfig() error {
 }
 
 func (s *Service) validateConfig() error {
-	// Validate communication mode
-	validModes := []string{"http", "http_post", "ws", "ws_reverse"}
+	validModes := []string{"http", "ws", "ws_reverse"}
 	isValidMode := false
 	for _, mode := range validModes {
 		if s.config.Mode == mode {
@@ -185,12 +122,15 @@ func (s *Service) validateConfig() error {
 		}
 	}
 	if !isValidMode {
-		return fmt.Errorf("unsupported communication mode: %s (supported: %v)", s.config.Mode, validModes)
+		return fmt.Errorf("unsupported connection mode: %s (supported: %v)", s.config.Mode, validModes)
 	}
 
 	// Validate mode-specific configuration
 	switch s.config.Mode {
 	case "http":
+		if s.config.HTTP == nil {
+			return fmt.Errorf("http configuration required")
+		}
 		if s.config.HTTP.Host == "" {
 			return fmt.Errorf("HTTP host is required for HTTP mode")
 		}
@@ -204,16 +144,19 @@ func (s *Service) validateConfig() error {
 			s.config.HTTP.Timeout = 30 // Set default timeout
 		}
 	case "ws":
+		if s.config.WebSocket == nil {
+			return fmt.Errorf("ws configuration required")
+		}
 		if s.config.WebSocket.Host == "" {
 			return fmt.Errorf("WebSocket host is required for ws mode")
 		}
 		if s.config.WebSocket.Port <= 0 || s.config.WebSocket.Port > 65535 {
 			return fmt.Errorf("invalid WebSocket port: %d (must be 1-65535)", s.config.WebSocket.Port)
 		}
-		if s.config.WebSocket.Path == "" {
-			s.config.WebSocket.Path = "/" // Set default path
-		}
 	case "ws_reverse":
+		if s.config.ReverseWebSocket == nil {
+			return fmt.Errorf("ws_reverse configuration required")
+		}
 		if s.config.ReverseWebSocket.Host == "" {
 			return fmt.Errorf("reverse WebSocket host is required for ws_reverse mode")
 		}
@@ -221,21 +164,39 @@ func (s *Service) validateConfig() error {
 			return fmt.Errorf("invalid reverse WebSocket port: %d (must be 1-65535)", s.config.ReverseWebSocket.Port)
 		}
 		if s.config.ReverseWebSocket.ReconnectInterval <= 0 {
-			s.config.ReverseWebSocket.ReconnectInterval = 3000 // Set default reconnect interval
+			s.config.ReverseWebSocket.ReconnectInterval = 300 // Set default reconnect interval
 		}
 	}
 
 	// Validate message format
+	if s.config.MessageFormat == "" {
+		s.config.MessageFormat = "array"
+	}
 	if s.config.MessageFormat != "string" && s.config.MessageFormat != "array" {
 		return fmt.Errorf("invalid message format: %s (supported: string, array)", s.config.MessageFormat)
 	}
 
 	// Validate heartbeat configuration
+	if s.config.Heartbeat == nil {
+		s.config.Heartbeat = &struct {
+			Enable   bool `json:"enable"`
+			Interval int  `json:"interval,omitempty"`
+		}{
+			Enable:   true,
+			Interval: 30000,
+		}
+	}
 	if s.config.Heartbeat.Enable && s.config.Heartbeat.Interval <= 0 {
 		s.config.Heartbeat.Interval = 15000 // Set default heartbeat interval
 	}
 
 	// Validate rate limit configuration
+	if s.config.RateLimit == nil {
+		s.config.RateLimit = &struct {
+			Enable   bool `json:"enable"`
+			Interval int  `json:"interval"`
+		}{Enable: false, Interval: 0}
+	}
 	if s.config.RateLimit.Enable && s.config.RateLimit.Interval <= 0 {
 		s.config.RateLimit.Interval = 500 // Set default rate limit interval
 	}
