@@ -2,10 +2,11 @@ package lagrange
 
 import (
 	"fmt"
-	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
-	LgrMessage "github.com/LagrangeDev/LagrangeGo/message"
 	"strconv"
 	"time"
+
+	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
+	LgrMessage "github.com/LagrangeDev/LagrangeGo/message"
 )
 
 func ParseElementsFromEvent(service *Service, msgEvent any) []*botc.MessageElement {
@@ -121,7 +122,18 @@ func ParseElementsFromEvent(service *Service, msgEvent any) []*botc.MessageEleme
 				}(),
 			)
 		case *LgrMessage.ShortVideoElement:
-			url, err := service.qqClient.GetVideoURL(CheckMessageType(msgEvent) == botc.GroupMessage, elem.UUID)
+			var (
+				url string
+				err error
+			)
+			switch e := msgEvent.(type) {
+			case *LgrMessage.PrivateMessage:
+				url, err = service.qqClient.GetPrivateVideoURL(elem.Node)
+			case *LgrMessage.GroupMessage:
+				url, err = service.qqClient.GetGroupVideoURL(e.GroupUin, elem.Node)
+			default:
+				continue
+			}
 			if err == nil {
 				_, err = service.grb.SaveRemoteResource(url)
 			}

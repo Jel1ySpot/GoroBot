@@ -2,12 +2,13 @@ package lagrange
 
 import (
 	"fmt"
-	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
-	LgrMessage "github.com/LagrangeDev/LagrangeGo/message"
 	"io"
 	"net/http"
 	"strconv"
+
+	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
+	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
+	LgrMessage "github.com/LagrangeDev/LagrangeGo/message"
 )
 
 type MessageBuilder struct {
@@ -203,9 +204,9 @@ func (b *MessageBuilder) Sticker(sid string) botc.MessageBuilder {
 	if b.err != nil {
 		return b
 	}
-	id, err := strconv.ParseUint(sid, 10, 16)
+	id, err := strconv.ParseUint(sid, 10, 32)
 	if err == nil {
-		b.elements = append(b.elements, LgrMessage.NewFace(uint16(id)))
+		b.elements = append(b.elements, LgrMessage.NewFace(uint32(id)))
 	} else {
 		b.err = err
 	}
