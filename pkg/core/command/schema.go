@@ -21,9 +21,10 @@ type SchemaOption struct {
 }
 
 type SchemaArgument struct {
-	Name string
-	Type InputType
-	Help string
+	Name     string
+	Type     InputType
+	Help     string
+	Required bool
 }
 
 func NewSchema(name string) *Schema {
@@ -44,9 +45,10 @@ func (s *Schema) AddOption(short string, name string, inputType InputType, help 
 
 func (s *Schema) AddArgument(name string, inputType InputType, help string) *Schema {
 	s.Arguments = append(s.Arguments, SchemaArgument{
-		Name: name,
-		Type: inputType,
-		Help: help,
+		Name:     name,
+		Type:     inputType,
+		Help:     help,
+		Required: true,
 	})
 	return s
 }

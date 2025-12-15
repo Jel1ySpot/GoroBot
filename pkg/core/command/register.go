@@ -1,6 +1,7 @@
 package command
 
 type Registry struct {
+	Name          string
 	Schema        Schema
 	Handler       Handler
 	Aliases       []alias

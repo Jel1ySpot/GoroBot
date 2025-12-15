@@ -35,7 +35,8 @@ func onebot_example() {
 	}))
 
 	// Example: Command-style handler using the correct API
-	_command_del, _ := grb.Command("echo <content:text>").
+	_command_del, _ := grb.Command("echo").
+		Argument("content", true, "").
 		Action(func(ctx *command.Context) {
 			ctx.ReplyText(ctx.Args["content"])
 		}).Build()

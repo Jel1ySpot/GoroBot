@@ -136,8 +136,10 @@ func (ctx *Context) processTokens(schema *Schema) error {
 		queue = queue[1:]
 	}
 
-	if argIndex < len(currentSchema.Arguments) {
-		return fmt.Errorf("argument '%s' is required", currentSchema.Arguments[argIndex].Name)
+	for i := argIndex; i < len(currentSchema.Arguments); i++ {
+		if currentSchema.Arguments[i].Required {
+			return fmt.Errorf("argument '%s' is required", currentSchema.Arguments[i].Name)
+		}
 	}
 
 	for _, opt := range currentSchema.Options {
