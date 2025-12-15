@@ -8,7 +8,7 @@ import (
 )
 
 type Config struct {
-	// connection mode: "http", "http_post", "ws", "ws_reverse"
+	// connection mode: "http", "ws", "ws_reverse"
 	Mode string `json:"mode"`
 
 	// HTTP configuration

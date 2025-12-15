@@ -40,6 +40,7 @@ type Service struct {
 	// WebSocket connections
 	wsDialer  *websocket.Dialer
 	apiConn   *websocket.Conn
+	apiConnMu sync.Mutex // 添加互斥锁保护 apiConn 写入
 	eventConn *websocket.Conn
 
 	// Context and cancellation
@@ -227,6 +228,8 @@ func (s *Service) ping() error {
 	case "ws", "ws_reverse":
 		// Send ping frame for WebSocket connections
 		if s.apiConn != nil {
+			s.apiConnMu.Lock()         // 加锁
+			defer s.apiConnMu.Unlock() // 解锁
 			return s.apiConn.WriteMessage(websocket.PingMessage, nil)
 		}
 		return nil

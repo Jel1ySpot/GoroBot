@@ -154,6 +154,9 @@ func (s *Service) makeHTTPRequest(action string, params map[string]interface{}) 
 }
 
 func (s *Service) makeWebSocketRequest(action string, params map[string]interface{}) (*APIResponse, error) {
+	s.apiConnMu.Lock()         // 加锁
+	defer s.apiConnMu.Unlock() // 解锁
+
 	if s.apiConn == nil {
 		return nil, fmt.Errorf("WebSocket API connection not available")
 	}
@@ -423,4 +426,6 @@ func (s *Service) getCachedFriendInfo(userID int64) (Friend, bool) {
 
 	friend, exists := s.cache.friendList[userID]
 	return friend, exists
+}
+
 }
