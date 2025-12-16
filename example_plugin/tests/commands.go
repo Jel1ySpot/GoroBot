@@ -23,6 +23,14 @@ func (s *Service) CommandsRegistry() error {
 		return err
 	}
 
+	if err := s.AddCommand("getResourceFromID", s.getResourceFromIDAction); err != nil {
+		return err
+	}
+
+	if err := s.AddCommand("sendImage", s.sendImageAction); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -45,5 +53,34 @@ func (s *Service) getOwnerAction(ctx *command.Context) error {
 		return nil
 	}
 	_, _ = ctx.ReplyText("owner for ", ctx.BotContext().ID(), ": ", owner, ctx.SenderID())
+	return nil
+}
+
+func (s *Service) getResourceFromIDAction(ctx *command.Context) error {
+	if len(ctx.Arguments) == 0 {
+		_, _ = ctx.ReplyText("usage: getResourceFromID <id>")
+		return nil
+	}
+	id := ctx.Arguments[0]
+	path, err := s.bot.LoadResourceFromID(id)
+	if err != nil {
+		return err
+	}
+	_, _ = ctx.ReplyText("resource path: ", path)
+	return nil
+}
+
+func (s *Service) sendImageAction(ctx *command.Context) error {
+	if len(ctx.Arguments) == 0 {
+		_, _ = ctx.ReplyText("usage: sendImage <path>")
+		return nil
+	}
+
+	path := ctx.Arguments[0]
+	_, err := ctx.BotContext().NewMessageBuilder().ImageFromFile(path).ReplyTo(ctx)
+	if err != nil {
+		_, _ = ctx.ReplyText("send image error: ", err.Error())
+		return err
+	}
 	return nil
 }
