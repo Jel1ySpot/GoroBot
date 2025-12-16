@@ -262,21 +262,28 @@ func (s *Service) connectionMonitor() {
 			s.logger.Debug("Connection monitor stopped")
 			return
 		case <-ticker.C:
-			if s.status == botc.Online {
-				// Ping to check connection health
-				if err := s.ping(); err != nil {
-					s.logger.Warning("Connection health check failed: %v", err)
-					// Attempt to reconnect
-					s.logger.Info("Attempting to reconnect...")
-					if err := s.reconnect(); err != nil {
-						s.logger.Error("Failed to reconnect: %v", err)
-						s.status = botc.Offline
-					} else {
-						s.logger.Success("Reconnected successfully")
-						s.status = botc.Online
-					}
+			if s.status != botc.Online {
+				s.logger.Info("Connection offline, attempting to reconnect...")
+				if err := s.reconnect(); err != nil {
+					s.logger.Error("Failed to reconnect: %v", err)
+					s.status = botc.Offline
 				} else {
-					s.logger.Debug("Connection health check passed")
+					s.logger.Success("Reconnected successfully")
+					s.status = botc.Online
+				}
+				continue
+			}
+
+			// Ping to check connection health
+			if err := s.ping(); err != nil {
+				s.logger.Warning("Connection health check failed: %v", err)
+				s.logger.Info("Attempting to reconnect...")
+				if err := s.reconnect(); err != nil {
+					s.logger.Error("Failed to reconnect: %v", err)
+					s.status = botc.Offline
+				} else {
+					s.logger.Success("Reconnected successfully")
+					s.status = botc.Online
 				}
 			}
 		}
