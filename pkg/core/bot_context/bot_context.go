@@ -14,7 +14,7 @@ type BotContext interface {
 	SendGroupMessage(target entity.Group, elements []*MessageElement) (*BaseMessage, error)
 	Contacts() []entity.User
 	Groups() []entity.Group
-	GetMessageFileUrl(msg *BaseMessage) (string, error)
+	DownloadResourceFromRefLink(refLink string) (string, error)
 }
 
 type LoginStatus int

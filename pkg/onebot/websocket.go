@@ -94,9 +94,9 @@ func (s *Service) connectToWebSocketServer() error {
 		return fmt.Errorf("failed to get login info: %v", err)
 	}
 
-	s.selfID = fmt.Sprintf("%d", loginInfo.UserID)
+	s.selfID = loginInfo.UserID
 	s.nickname = loginInfo.Nickname
-	s.logger.Success("Bot information retrieved - ID: %s, nickname: %s", s.selfID, s.nickname)
+	s.logger.Success("Bot information retrieved - ID: %d, nickname: %s", s.selfID, s.nickname)
 
 	return nil
 }

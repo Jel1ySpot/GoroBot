@@ -25,8 +25,9 @@ func example_main() {
 	}))
 
 	_command_del, _ := grb.Command("echo <content:text>").
-		Action(func(ctx *command.Context) {
-			ctx.ReplyText(ctx.KvArgs["content"])
+		Action(func(ctx *command.Context) error {
+			_, _ = ctx.ReplyText(ctx.KvArgs["content"])
+			return nil
 		}).
 		Build()
 

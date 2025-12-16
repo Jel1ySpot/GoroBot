@@ -54,14 +54,14 @@ func (s *Service) resourceService(writer http.ResponseWriter, request *http.Requ
 	}
 
 	// 获取资源路径
-	resource, err := s.grb.GetResource(id)
+	resourcePath, err := s.grb.LoadResourceFromID(id)
 	if err != nil {
 		http.Error(writer, "Resource not found", http.StatusNotFound)
 		return
 	}
 
 	// 读取资源文件内容
-	data, err := os.ReadFile(resource.FilePath)
+	data, err := os.ReadFile(resourcePath)
 	if err != nil {
 		http.Error(writer, "Resource not found", http.StatusNotFound)
 		return

@@ -5,6 +5,8 @@ import (
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
 	"github.com/tencent-connect/botgo/dto"
+	urlpkg "net/url"
+	"path"
 	"strings"
 	"unsafe"
 )
@@ -38,23 +40,26 @@ func (m *Message) ToBase(grb *GoroBot.Instant) *botc.BaseMessage {
 
 	for _, attachment := range e.Attachments {
 		if strings.HasPrefix(attachment.ContentType, "image") {
-			resource, err := grb.SaveRemoteResource(attachment.URL)
-			if err != nil {
-				continue
-			}
-			b.Append(botc.ImageElement, "[图片]", resource.ID)
+			refLink := urlpkg.Values{
+				"url": {attachment.URL},
+				"ext": {strings.TrimPrefix(path.Ext(attachment.URL), ".")},
+			}.Encode()
+			id := grb.SaveResourceLink("qbot", refLink)
+			b.Append(botc.ImageElement, "[图片]", id)
 		} else if strings.HasPrefix(attachment.ContentType, "video") {
-			resource, err := grb.SaveRemoteResource(attachment.URL)
-			if err != nil {
-				continue
-			}
-			b.Append(botc.VideoElement, "[视频]", resource.ID)
+			refLink := urlpkg.Values{
+				"url": {attachment.URL},
+				"ext": {strings.TrimPrefix(path.Ext(attachment.URL), ".")},
+			}.Encode()
+			id := grb.SaveResourceLink("qbot", refLink)
+			b.Append(botc.VideoElement, "[视频]", id)
 		} else if strings.HasPrefix(attachment.ContentType, "voice") {
-			resource, err := grb.SaveRemoteResource(attachment.URL)
-			if err != nil {
-				continue
-			}
-			b.Append(botc.VoiceElement, "[语音]", resource.ID)
+			refLink := urlpkg.Values{
+				"url": {attachment.URL},
+				"ext": {strings.TrimPrefix(path.Ext(attachment.URL), ".")},
+			}.Encode()
+			id := grb.SaveResourceLink("qbot", refLink)
+			b.Append(botc.VoiceElement, "[语音]", id)
 		}
 	}
 

@@ -2,6 +2,7 @@ package lagrange
 
 import (
 	"fmt"
+
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	LgrMessage "github.com/LagrangeDev/LagrangeGo/message"
 )
@@ -66,9 +67,9 @@ func (m *MessageContext) Message() *botc.BaseMessage {
 func (m *MessageContext) SenderID() string {
 	switch m.messageType {
 	case botc.DirectMessage:
-		return fmt.Sprintf("%d", m.privateMsg.Sender.Uin)
+		return GenUserID(m.privateMsg.Sender.Uin)
 	case botc.GroupMessage:
-		return fmt.Sprintf("%d", m.groupMsg.Sender.Uin)
+		return GenUserID(m.groupMsg.Sender.Uin)
 	}
 	return ""
 }

@@ -7,8 +7,10 @@ import (
 	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
 	"github.com/tencent-connect/botgo/dto"
-	"net/url"
+	urlpkg "net/url"
 	"os"
+	"path"
+	"strings"
 	"time"
 )
 
@@ -90,8 +92,13 @@ func (m *MessageBuilder) ImageFromFile(path string) botc.MessageBuilder {
 }
 
 func (m *MessageBuilder) ImageFromUrl(url string) botc.MessageBuilder {
-	if resource, err := m.service.grb.SaveRemoteResource(url); err == nil {
-		if data, err := m.service.grb.GetResourceData(resource.ID); err == nil {
+	refLink := urlpkg.Values{
+		"url": {url},
+		"ext": {strings.TrimPrefix(path.Ext(url), ".")},
+	}.Encode()
+	id := m.service.grb.SaveResourceLink(m.Protocol(), refLink)
+	if pathStr, err := m.service.grb.LoadResourceFromID(id); err == nil {
+		if data, err := os.ReadFile(pathStr); err == nil {
 			m.ImageFromData(data)
 		}
 	}
@@ -113,8 +120,13 @@ func (m *MessageBuilder) VideoFromFile(path string) *MessageBuilder {
 }
 
 func (m *MessageBuilder) VideoFromUrl(url string) *MessageBuilder {
-	if resource, err := m.service.grb.SaveRemoteResource(url); err == nil {
-		if data, err := m.service.grb.GetResourceData(resource.ID); err == nil {
+	refLink := urlpkg.Values{
+		"url": {url},
+		"ext": {strings.TrimPrefix(path.Ext(url), ".")},
+	}.Encode()
+	id := m.service.grb.SaveResourceLink(m.Protocol(), refLink)
+	if pathStr, err := m.service.grb.LoadResourceFromID(id); err == nil {
+		if data, err := os.ReadFile(pathStr); err == nil {
 			m.VideoFromData(data)
 		}
 	}
@@ -136,8 +148,13 @@ func (m *MessageBuilder) VoiceFromFile(path string) *MessageBuilder {
 }
 
 func (m *MessageBuilder) VoiceFromUrl(url string) *MessageBuilder {
-	if resource, err := m.service.grb.SaveRemoteResource(url); err == nil {
-		if data, err := m.service.grb.GetResourceData(resource.ID); err == nil {
+	refLink := urlpkg.Values{
+		"url": {url},
+		"ext": {strings.TrimPrefix(path.Ext(url), ".")},
+	}.Encode()
+	id := m.service.grb.SaveResourceLink(m.Protocol(), refLink)
+	if pathStr, err := m.service.grb.LoadResourceFromID(id); err == nil {
+		if data, err := os.ReadFile(pathStr); err == nil {
 			m.VoiceFromData(data)
 		}
 	}

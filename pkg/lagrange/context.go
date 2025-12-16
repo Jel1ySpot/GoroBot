@@ -2,10 +2,10 @@ package lagrange
 
 import (
 	"fmt"
+
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
 	lgrEntity "github.com/LagrangeDev/LagrangeGo/client/entity"
-	"strconv"
 )
 
 type Context struct {
@@ -13,7 +13,7 @@ type Context struct {
 }
 
 func (ctx *Context) ID() string {
-	return fmt.Sprintf("%d", ctx.service.config.Account.Uin)
+	return GenUserID(ctx.service.config.Account.Uin)
 }
 
 func (ctx *Context) Name() string {
@@ -22,6 +22,10 @@ func (ctx *Context) Name() string {
 
 func (ctx *Context) Protocol() string {
 	return "lagrange"
+}
+
+func (ctx *Context) DownloadResourceFromRefLink(refLink string) (string, error) {
+	return ctx.service.DownloadResourceFromRefLink(refLink)
 }
 
 func (ctx *Context) Status() botc.LoginStatus {
@@ -57,39 +61,11 @@ func (ctx *Context) SendGroupMessage(target entity.Group, elements []*botc.Messa
 
 	elems := TranslateMessageElement(ctx.service, elements)
 
-	if msg, err := ctx.service.qqClient.SendGroupMessage(uint32(uin), elems); err != nil {
+	if msg, err := ctx.service.qqClient.SendGroupMessage(uin, elems); err != nil {
 		return nil, err
 	} else {
 		return ParseMessageEvent(ctx.service, msg)
 	}
-}
-
-func (ctx *Context) GetMessageFileUrl(msg *botc.BaseMessage) (string, error) {
-	var elem *botc.MessageElement
-	for _, elem = range msg.Elements {
-		if elem.Type == botc.FileElement {
-			break
-		}
-	}
-	if elem == nil || elem.Type != botc.FileElement {
-		return "", fmt.Errorf("file element not exist")
-	}
-
-	info, ok := entity.ParseInfo(elem.Source)
-	if !ok || info.Protocol != "lagrange" {
-		return "", fmt.Errorf("invalid source")
-	}
-	switch msg.MessageType {
-	case botc.DirectMessage:
-		return ctx.service.qqClient.GetPrivateFileURL(info.Args[0], info.Args[1])
-	case botc.GroupMessage:
-		id, err := strconv.ParseUint(info.Args[0], 10, 32)
-		if err != nil {
-			return "", fmt.Errorf("parse file detail error: %v", err)
-		}
-		return ctx.service.qqClient.GetGroupFileURL(uint32(id), info.Args[1])
-	}
-	return "", nil
 }
 
 func (ctx *Context) Contacts() []entity.User {

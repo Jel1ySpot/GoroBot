@@ -1,6 +1,7 @@
 package dice
 
 import (
+	"fmt"
 	"math/rand"
 	"strconv"
 
@@ -31,19 +32,20 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 			ctx.KvArgs["upper_bound"] = ctx.String()[1:]
 			return ctx
 		}).
-		Action(func(ctx *command.Context) {
+		Action(func(ctx *command.Context) error {
 			limit, err := strconv.Atoi(ctx.KvArgs["upper_bound"])
 			if err != nil {
 				_, _ = ctx.ReplyText("无效的骰子点数上限: ", err.Error())
-				return
+				return err
 			}
 
 			if limit <= 0 {
 				_, _ = ctx.ReplyText("骰子点数上限必须大于 0")
-				return
+				return fmt.Errorf("invalid upper bound")
 			}
 
 			_, _ = ctx.ReplyText(strconv.Itoa(rand.Intn(limit) + 1))
+			return nil
 		}).
 		Build()
 

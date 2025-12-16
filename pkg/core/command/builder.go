@@ -66,11 +66,8 @@ func (f *FormatBuilder) Argument(name string, inputType InputType, required bool
 	return f
 }
 
-func (f *FormatBuilder) Action(handler func(ctx *Context)) *FormatBuilder {
-	f.registry.Handler = func(ctx *Context) error {
-		handler(ctx)
-		return nil
-	}
+func (f *FormatBuilder) Action(handler Handler) *FormatBuilder {
+	f.registry.Handler = handler
 	return f
 }
 

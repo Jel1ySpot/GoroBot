@@ -1,19 +1,15 @@
-package ping
+package tests
 
 import (
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
 )
 
 type Service struct {
-	bot *GoroBot.Instant
-
+	bot         *GoroBot.Instant
 	releaseFunc []func()
 }
 
-func (s *Service) Name() string {
-	return "Ping"
-}
+func (s *Service) Name() string { return "Tests" }
 
 func Create() *Service {
 	return &Service{}
@@ -22,15 +18,9 @@ func Create() *Service {
 func (s *Service) Init(grb *GoroBot.Instant) error {
 	s.bot = grb
 
-	delFn, _ := grb.Command("ping").
-		Alias("^ping$", nil).
-		Action(func(ctx *command.Context) error {
-			_, _ = ctx.ReplyText("🏓")
-			return nil
-		}).
-		Build()
-
-	s.releaseFunc = append(s.releaseFunc, delFn)
+	if err := s.CommandsRegistry(); err != nil {
+		return err
+	}
 
 	return nil
 }

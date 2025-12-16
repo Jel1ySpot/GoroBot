@@ -12,7 +12,7 @@ type Context struct {
 }
 
 func (ctx *Context) ID() string {
-	return ctx.service.selfID
+	return genUserID(ctx.service.selfID)
 }
 
 func (ctx *Context) Name() string {
@@ -21,6 +21,10 @@ func (ctx *Context) Name() string {
 
 func (ctx *Context) Protocol() string {
 	return "onebot"
+}
+
+func (ctx *Context) DownloadResourceFromRefLink(refLink string) (string, error) {
+	return ctx.service.DownloadResourceFromRefLink(refLink)
 }
 
 func (ctx *Context) Status() botc.LoginStatus {
@@ -55,7 +59,7 @@ func (ctx *Context) SendDirectMessage(target entity.User, elements []*botc.Messa
 		Sender: &entity.Sender{
 			User: &entity.User{
 				Base: &entity.Base{
-					ID:   ctx.service.selfID,
+					ID:   genUserID(ctx.service.selfID),
 					Name: ctx.service.nickname,
 				},
 			},
@@ -84,26 +88,13 @@ func (ctx *Context) SendGroupMessage(target entity.Group, elements []*botc.Messa
 		Sender: &entity.Sender{
 			User: &entity.User{
 				Base: &entity.Base{
-					ID:   ctx.service.selfID,
+					ID:   genUserID(ctx.service.selfID),
 					Name: ctx.service.nickname,
 				},
 			},
 			From: target.Base,
 		},
 	}, nil
-}
-
-func (ctx *Context) GetMessageFileUrl(msg *botc.BaseMessage) (string, error) {
-	// Find file element in message
-	for _, elem := range msg.Elements {
-		if elem.Type == botc.ImageElement || elem.Type == botc.VoiceElement || elem.Type == botc.FileElement {
-			// For OneBot, the URL should be in the Source field
-			if elem.Source != "" {
-				return elem.Source, nil
-			}
-		}
-	}
-	return "", fmt.Errorf("no file element found in message")
 }
 
 func (ctx *Context) Contacts() []entity.User {
@@ -190,24 +181,24 @@ func (ctx *Context) elementsToString(elements []*botc.MessageElement) string {
 			result += escapeCQCode(elem.Content)
 		case botc.ImageElement:
 			// Get resource file path from resource ID
-			if resource, err := ctx.service.grb.GetResource(elem.Source); err == nil {
-				result += fmt.Sprintf("[CQ:image,file=file://%s]", resource.FilePath)
+			if path, err := ctx.service.grb.LoadResourceFromID(elem.Source); err == nil {
+				result += fmt.Sprintf("[CQ:image,file=file://%s]", path)
 			} else {
 				// Fallback to source as URL
 				result += fmt.Sprintf("[CQ:image,file=%s]", elem.Source)
 			}
 		case botc.VoiceElement:
 			// Get resource file path from resource ID
-			if resource, err := ctx.service.grb.GetResource(elem.Source); err == nil {
-				result += fmt.Sprintf("[CQ:record,file=file://%s]", resource.FilePath)
+			if path, err := ctx.service.grb.LoadResourceFromID(elem.Source); err == nil {
+				result += fmt.Sprintf("[CQ:record,file=file://%s]", path)
 			} else {
 				// Fallback to source as URL
 				result += fmt.Sprintf("[CQ:record,file=%s]", elem.Source)
 			}
 		case botc.VideoElement:
 			// Get resource file path from resource ID
-			if resource, err := ctx.service.grb.GetResource(elem.Source); err == nil {
-				result += fmt.Sprintf("[CQ:video,file=file://%s]", resource.FilePath)
+			if path, err := ctx.service.grb.LoadResourceFromID(elem.Source); err == nil {
+				result += fmt.Sprintf("[CQ:video,file=file://%s]", path)
 			} else {
 				// Fallback to source as URL
 				result += fmt.Sprintf("[CQ:video,file=%s]", elem.Source)
@@ -237,8 +228,8 @@ func (ctx *Context) elementsToArray(elements []*botc.MessageElement) []map[strin
 		case botc.ImageElement:
 			segment["type"] = "image"
 			// Get resource file path from resource ID
-			if resource, err := ctx.service.grb.GetResource(elem.Source); err == nil {
-				data["file"] = fmt.Sprintf("file://%s", resource.FilePath)
+			if path, err := ctx.service.grb.LoadResourceFromID(elem.Source); err == nil {
+				data["file"] = fmt.Sprintf("file://%s", path)
 			} else {
 				// Fallback to source as URL
 				data["file"] = elem.Source
@@ -246,8 +237,8 @@ func (ctx *Context) elementsToArray(elements []*botc.MessageElement) []map[strin
 		case botc.VoiceElement:
 			segment["type"] = "record"
 			// Get resource file path from resource ID
-			if resource, err := ctx.service.grb.GetResource(elem.Source); err == nil {
-				data["file"] = fmt.Sprintf("file://%s", resource.FilePath)
+			if path, err := ctx.service.grb.LoadResourceFromID(elem.Source); err == nil {
+				data["file"] = fmt.Sprintf("file://%s", path)
 			} else {
 				// Fallback to source as URL
 				data["file"] = elem.Source
@@ -255,8 +246,8 @@ func (ctx *Context) elementsToArray(elements []*botc.MessageElement) []map[strin
 		case botc.VideoElement:
 			segment["type"] = "video"
 			// Get resource file path from resource ID
-			if resource, err := ctx.service.grb.GetResource(elem.Source); err == nil {
-				data["file"] = fmt.Sprintf("file://%s", resource.FilePath)
+			if path, err := ctx.service.grb.LoadResourceFromID(elem.Source); err == nil {
+				data["file"] = fmt.Sprintf("file://%s", path)
 			} else {
 				// Fallback to source as URL
 				data["file"] = elem.Source

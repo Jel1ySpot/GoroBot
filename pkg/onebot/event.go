@@ -3,6 +3,8 @@ package onebot
 import (
 	"encoding/json"
 	"fmt"
+	urlpkg "net/url"
+	"path"
 	"strings"
 	"time"
 
@@ -342,7 +344,7 @@ func (s *Service) parseCQCodeMessage(message string) ([]*botc.MessageElement, st
 			if file, ok := params["file"]; ok {
 				// Save resource and get resource ID
 				resourceID := s.saveImageResource(file)
-				b.Append(botc.ImageElement, "[图片]", resourceID)
+				b.Append(botc.ImageElement, util.CoalesceString(params["summary"], "[图片]"), resourceID)
 			}
 		case "record":
 			if file, ok := params["file"]; ok {
@@ -516,15 +518,14 @@ func (s *Service) saveImageResource(url string) string {
 		return ""
 	}
 
-	// Try to save the resource using the core resource system
-	resource, err := s.grb.SaveRemoteResource(url)
-	if err != nil {
-		s.logger.Error("Failed to save image resource from %s: %v", url, err)
-		return url // Return original URL as fallback
-	}
+	refLink := urlpkg.Values{
+		"url": {url},
+		"ext": {strings.TrimPrefix(path.Ext(url), ".")},
+	}.Encode()
 
-	s.logger.Debug("Saved image resource: %s -> %s", url, resource.ID)
-	return resource.ID
+	resourceID := s.grb.SaveResourceLink(s.Protocol(), refLink)
+	s.logger.Debug("Saved image resource link: %s -> %s", url, resourceID)
+	return resourceID
 }
 
 func (s *Service) saveVoiceResource(url string) string {
@@ -532,15 +533,14 @@ func (s *Service) saveVoiceResource(url string) string {
 		return ""
 	}
 
-	// Try to save the resource using the core resource system
-	resource, err := s.grb.SaveRemoteResource(url)
-	if err != nil {
-		s.logger.Error("Failed to save voice resource from %s: %v", url, err)
-		return url // Return original URL as fallback
-	}
+	refLink := urlpkg.Values{
+		"url": {url},
+		"ext": {strings.TrimPrefix(path.Ext(url), ".")},
+	}.Encode()
 
-	s.logger.Debug("Saved voice resource: %s -> %s", url, resource.ID)
-	return resource.ID
+	resourceID := s.grb.SaveResourceLink(s.Protocol(), refLink)
+	s.logger.Debug("Saved voice resource link: %s -> %s", url, resourceID)
+	return resourceID
 }
 
 func (s *Service) saveVideoResource(url string) string {
@@ -548,13 +548,12 @@ func (s *Service) saveVideoResource(url string) string {
 		return ""
 	}
 
-	// Try to save the resource using the core resource system
-	resource, err := s.grb.SaveRemoteResource(url)
-	if err != nil {
-		s.logger.Error("Failed to save video resource from %s: %v", url, err)
-		return url // Return original URL as fallback
-	}
+	refLink := urlpkg.Values{
+		"url": {url},
+		"ext": {strings.TrimPrefix(path.Ext(url), ".")},
+	}.Encode()
 
-	s.logger.Debug("Saved video resource: %s -> %s", url, resource.ID)
-	return resource.ID
+	resourceID := s.grb.SaveResourceLink(s.Protocol(), refLink)
+	s.logger.Debug("Saved video resource link: %s -> %s", url, resourceID)
+	return resourceID
 }

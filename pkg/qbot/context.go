@@ -17,9 +17,9 @@ func NewContext(service *Service) *Context {
 func (c *Context) ID() string {
 	u, err := c.api.Me(context.Background())
 	if err != nil {
-		return c.config.Credentials.AppID
+		return fmt.Sprintf("%s:%s", c.Protocol(), c.config.Credentials.AppID)
 	}
-	return u.ID
+	return fmt.Sprintf("%s:%s", c.Protocol(), u.ID)
 }
 
 func (c *Context) Name() string {
@@ -28,6 +28,10 @@ func (c *Context) Name() string {
 
 func (c *Context) Protocol() string {
 	return "qbot"
+}
+
+func (c *Context) DownloadResourceFromRefLink(refLink string) (string, error) {
+	return c.service.DownloadResourceFromRefLink(refLink)
 }
 
 func (c *Context) Status() botc.LoginStatus {
@@ -57,8 +61,4 @@ func (c *Context) Contacts() []entity.User {
 
 func (c *Context) Groups() []entity.Group {
 	return nil
-}
-
-func (c *Context) GetMessageFileUrl(msg *botc.BaseMessage) (string, error) {
-	return "", nil
 }

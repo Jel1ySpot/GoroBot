@@ -2,7 +2,10 @@ package lagrange
 
 import (
 	"fmt"
+	urlpkg "net/url"
+	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
@@ -44,39 +47,42 @@ func ParseElementsFromEvent(service *Service, msgEvent any) []*botc.MessageEleme
 			)
 		case *LgrMessage.VoiceElement:
 			var (
-				url string
-				err error
+				resourceURL string
+				err         error
 			)
 			switch msgEvent := msgEvent.(type) {
 			case *LgrMessage.GroupMessage:
-				url, err = service.qqClient.GetGroupRecordURL(msgEvent.GroupUin, elem.Node)
-				if err == nil {
-					_, err = service.grb.SaveRemoteResource(url)
-				}
+				resourceURL, err = service.qqClient.GetGroupRecordURL(msgEvent.GroupUin, elem.Node)
 			case *LgrMessage.PrivateMessage:
-				url, err = service.qqClient.GetPrivateRecordURL(elem.Node)
-				if err == nil {
-					_, err = service.grb.SaveRemoteResource(url)
-				}
+				resourceURL, err = service.qqClient.GetPrivateRecordURL(elem.Node)
 			}
 			if err != nil {
 				service.logger.Error("save voice err: %v", err)
 			}
 
+			refLink := ""
+			if resourceURL != "" {
+				refLink = urlpkg.Values{
+					"url": {resourceURL},
+					"ext": {strings.TrimPrefix(path.Ext(resourceURL), ".")},
+				}.Encode()
+			}
+			resourceID := service.grb.SaveResourceLink(service.Protocol(), refLink)
+
 			b.Append(
 				botc.VoiceElement,
 				"[录音]",
-				fmt.Sprintf("%x", elem.Md5),
+				resourceID,
 			)
 		case *LgrMessage.ImageElement:
 			var (
-				imageElem *LgrMessage.ImageElement
-				err       error
-				url       string
+				imageElem   *LgrMessage.ImageElement
+				err         error
+				resourceURL string
 			)
 
 			if elem.URL != "" {
-				url = elem.URL
+				resourceURL = elem.URL
 			} else {
 				if CheckMessageType(msgEvent) == botc.GroupMessage {
 					imageElem, err = service.qqClient.QueryGroupImage(elem.Md5, elem.FileUUID)
@@ -84,16 +90,22 @@ func ParseElementsFromEvent(service *Service, msgEvent any) []*botc.MessageEleme
 					imageElem, err = service.qqClient.QueryFriendImage(elem.Md5, elem.FileUUID)
 				}
 				if err == nil {
-					url = imageElem.URL
+					resourceURL = imageElem.URL
 				}
 			}
 
-			if err == nil {
-				_, err = service.grb.SaveRemoteResource(url)
-			}
 			if err != nil {
 				service.logger.Error("save image err: %v", err)
 			}
+
+			refLink := ""
+			if resourceURL != "" {
+				refLink = urlpkg.Values{
+					"url": {resourceURL},
+					"ext": {strings.TrimPrefix(path.Ext(resourceURL), ".")},
+				}.Encode()
+			}
+			resourceID := service.grb.SaveResourceLink(service.Protocol(), refLink)
 
 			b.Append(
 				botc.ImageElement,
@@ -106,43 +118,61 @@ func ParseElementsFromEvent(service *Service, msgEvent any) []*botc.MessageEleme
 					}
 					return "[图片]"
 				}(),
-				fmt.Sprintf("%x", elem.Md5),
+				resourceID,
 			)
 		case *LgrMessage.FileElement:
-			b.Append(botc.FileElement,
-				"[文件]",
-				func() string {
-					switch e := msgEvent.(type) {
-					case *LgrMessage.PrivateMessage:
-						return fmt.Sprintf("lagrange:%s&%s", elem.FileUUID, elem.FileHash)
-					case *LgrMessage.GroupMessage:
-						return fmt.Sprintf("lagrange:%d&%s", e.GroupUin, elem.FileID)
-					}
-					return ""
-				}(),
-			)
-		case *LgrMessage.ShortVideoElement:
-			var (
-				url string
-				err error
-			)
+			refLink := ""
 			switch e := msgEvent.(type) {
 			case *LgrMessage.PrivateMessage:
-				url, err = service.qqClient.GetPrivateVideoURL(elem.Node)
+				if resourceURL, err := service.qqClient.GetPrivateFileURL(elem.FileUUID, elem.FileHash); err == nil {
+					refLink = urlpkg.Values{
+						"url": {resourceURL},
+						"ext": {strings.TrimPrefix(path.Ext(resourceURL), ".")},
+					}.Encode()
+				} else {
+					service.logger.Error("get private file url err: %v", err)
+				}
 			case *LgrMessage.GroupMessage:
-				url, err = service.qqClient.GetGroupVideoURL(e.GroupUin, elem.Node)
+				if resourceURL, err := service.qqClient.GetGroupFileURL(e.GroupUin, elem.FileID); err == nil {
+					refLink = urlpkg.Values{
+						"url": {resourceURL},
+						"ext": {strings.TrimPrefix(path.Ext(resourceURL), ".")},
+					}.Encode()
+				} else {
+					service.logger.Error("get group file url err: %v", err)
+				}
+			}
+			resourceID := service.grb.SaveResourceLink(service.Protocol(), refLink)
+			b.Append(botc.FileElement, "[文件]", resourceID)
+		case *LgrMessage.ShortVideoElement:
+			resourceID := ""
+			switch e := msgEvent.(type) {
+			case *LgrMessage.PrivateMessage:
+				if resourceURL, err := service.qqClient.GetPrivateVideoURL(elem.Node); err == nil {
+					refLink := urlpkg.Values{
+						"url": {resourceURL},
+						"ext": {strings.TrimPrefix(path.Ext(resourceURL), ".")},
+					}.Encode()
+					resourceID = service.grb.SaveResourceLink(service.Protocol(), refLink)
+				} else {
+					service.logger.Error("get private video url err: %v", err)
+				}
+			case *LgrMessage.GroupMessage:
+				if resourceURL, err := service.qqClient.GetGroupVideoURL(e.GroupUin, elem.Node); err == nil {
+					refLink := urlpkg.Values{
+						"url": {resourceURL},
+						"ext": {strings.TrimPrefix(path.Ext(resourceURL), ".")},
+					}.Encode()
+					resourceID = service.grb.SaveResourceLink(service.Protocol(), refLink)
+				} else {
+					service.logger.Error("get group video url err: %v", err)
+				}
 			default:
 				continue
 			}
-			if err == nil {
-				_, err = service.grb.SaveRemoteResource(url)
-			}
-			if err != nil {
-				service.logger.Error("save short video err: %v", err)
-			}
 			b.Append(botc.VideoElement,
 				"[视频]",
-				fmt.Sprintf("%x", elem.Md5),
+				resourceID,
 			)
 		}
 	}
@@ -190,20 +220,20 @@ func TranslateMessageElement(service *Service, elements []*botc.MessageElement) 
 		case botc.MentionElement:
 			b.Mention(elem.Source)
 		case botc.ImageElement:
-			if resource, err := service.grb.GetResource(elem.Source); err == nil {
-				b.ImageFromFile(resource.FilePath)
+			if pathStr, err := service.grb.LoadResourceFromID(elem.Source); err == nil {
+				b.ImageFromFile(pathStr)
 			}
 		case botc.VideoElement:
-			if resource, err := service.grb.GetResource(elem.Source); err == nil {
-				b.VideoFromFile(resource.FilePath)
+			if pathStr, err := service.grb.LoadResourceFromID(elem.Source); err == nil {
+				b.VideoFromFile(pathStr)
 			}
 		case botc.FileElement:
-			if resource, err := service.grb.GetResource(elem.Source); err == nil {
-				b.File(resource.FilePath, elem.Content)
+			if pathStr, err := service.grb.LoadResourceFromID(elem.Source); err == nil {
+				b.File(pathStr, elem.Content)
 			}
 		case botc.VoiceElement:
-			if resource, err := service.grb.GetResource(elem.Source); err == nil {
-				b.Voice(resource.FilePath)
+			if pathStr, err := service.grb.LoadResourceFromID(elem.Source); err == nil {
+				b.Voice(pathStr)
 			}
 		case botc.StickerElement:
 			b.Sticker(elem.Source)

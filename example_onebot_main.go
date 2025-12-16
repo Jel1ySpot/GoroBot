@@ -4,6 +4,7 @@ import (
 	"github.com/Jel1ySpot/GoroBot/example_plugin/dice"
 	"github.com/Jel1ySpot/GoroBot/example_plugin/message_logger"
 	"github.com/Jel1ySpot/GoroBot/example_plugin/ping"
+	"github.com/Jel1ySpot/GoroBot/example_plugin/tests"
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
@@ -26,6 +27,7 @@ func onebot_example() {
 	grb.Use(message_logger.Create())
 	grb.Use(ping.Create())
 	grb.Use(dice.Create())
+	grb.Use(tests.Create())
 
 	// Example: Echo bot that responds to "ping" with "pong"
 	var del func()
@@ -39,8 +41,9 @@ func onebot_example() {
 	// Example: Command-style handler using the correct API
 	_command_del, _ := grb.Command("echo").
 		Argument("content", command.String, true, "").
-		Action(func(ctx *command.Context) {
-			ctx.ReplyText(ctx.KvArgs["content"])
+		Action(func(ctx *command.Context) error {
+			_, _ = ctx.ReplyText(ctx.KvArgs["content"])
+			return nil
 		}).Build()
 
 	// Keep the command handler reference to avoid unused variable error
