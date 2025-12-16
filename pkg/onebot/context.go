@@ -1,7 +1,10 @@
 package onebot
 
 import (
+	"encoding/base64"
 	"fmt"
+	"os"
+	"strings"
 
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
@@ -227,13 +230,7 @@ func (ctx *Context) elementsToArray(elements []*botc.MessageElement) []map[strin
 			data["text"] = elem.Content
 		case botc.ImageElement:
 			segment["type"] = "image"
-			// Get resource file path from resource ID
-			if path, err := ctx.service.grb.LoadResourceFromID(elem.Source); err == nil {
-				data["file"] = fmt.Sprintf("file://%s", path)
-			} else {
-				// Fallback to source as URL
-				data["file"] = elem.Source
-			}
+			data["file"] = ctx.encodeImageFile(elem.Source)
 		case botc.VoiceElement:
 			segment["type"] = "record"
 			// Get resource file path from resource ID
@@ -270,4 +267,31 @@ func (ctx *Context) elementsToArray(elements []*botc.MessageElement) []map[strin
 	}
 
 	return result
+}
+
+func (ctx *Context) encodeImageFile(source string) string {
+	if path, err := ctx.service.grb.LoadResourceFromID(source); err == nil {
+		if dataURL, ok := toDataURL(path); ok {
+			return dataURL
+		}
+	}
+
+	path := source
+	if strings.HasPrefix(source, "file://") {
+		path = strings.TrimPrefix(source, "file://")
+	}
+	if dataURL, ok := toDataURL(path); ok {
+		return dataURL
+	}
+
+	return source
+}
+
+func toDataURL(path string) (string, bool) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", false
+	}
+	encoded := base64.StdEncoding.EncodeToString(data)
+	return "data:application/octet-stream;base64," + encoded, true
 }

@@ -2,6 +2,8 @@ package onebot
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"strconv"
 	"strings"
 
@@ -12,6 +14,7 @@ import (
 type MessageBuilder struct {
 	service  *Service
 	elements []*botc.MessageElement
+	err      error
 }
 
 func (mb *MessageBuilder) Protocol() string {
@@ -19,6 +22,9 @@ func (mb *MessageBuilder) Protocol() string {
 }
 
 func (mb *MessageBuilder) Text(text string) botc.MessageBuilder {
+	if mb.err != nil {
+		return mb
+	}
 	mb.elements = append(mb.elements, &botc.MessageElement{
 		Type:    botc.TextElement,
 		Content: text,
@@ -27,6 +33,9 @@ func (mb *MessageBuilder) Text(text string) botc.MessageBuilder {
 }
 
 func (mb *MessageBuilder) Quote(msg *botc.BaseMessage) botc.MessageBuilder {
+	if mb.err != nil {
+		return mb
+	}
 	mb.elements = append(mb.elements, &botc.MessageElement{
 		Type:    botc.QuoteElement,
 		Content: msg.ID,
@@ -35,6 +44,9 @@ func (mb *MessageBuilder) Quote(msg *botc.BaseMessage) botc.MessageBuilder {
 }
 
 func (mb *MessageBuilder) Mention(id string) botc.MessageBuilder {
+	if mb.err != nil {
+		return mb
+	}
 	mb.elements = append(mb.elements, &botc.MessageElement{
 		Type:    botc.MentionElement,
 		Content: id,
@@ -43,15 +55,28 @@ func (mb *MessageBuilder) Mention(id string) botc.MessageBuilder {
 }
 
 func (mb *MessageBuilder) ImageFromFile(path string) botc.MessageBuilder {
+	if mb.err != nil {
+		return mb
+	}
+
+	file, err := os.OpenFile(path, os.O_RDONLY, 0644)
+	if err != nil {
+		mb.err = fmt.Errorf("failed to open image file: %w", err)
+		return mb
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+
 	// For OneBot, we need to upload the file first or use the file path directly
-	mb.elements = append(mb.elements, &botc.MessageElement{
-		Type:   botc.ImageElement,
-		Source: fmt.Sprintf("file://%s", path),
-	})
+	mb.ImageFromData(data)
 	return mb
 }
 
 func (mb *MessageBuilder) ImageFromUrl(url string) botc.MessageBuilder {
+	if mb.err != nil {
+		return mb
+	}
 	mb.elements = append(mb.elements, &botc.MessageElement{
 		Type:   botc.ImageElement,
 		Source: url,
@@ -60,17 +85,20 @@ func (mb *MessageBuilder) ImageFromUrl(url string) botc.MessageBuilder {
 }
 
 func (mb *MessageBuilder) ImageFromData(data []byte) botc.MessageBuilder {
+	if mb.err != nil {
+		return mb
+	}
 	// For OneBot, we could encode as base64 or save to temp file
 	// Using base64 encoding as per OneBot specification
 	encoded := fmt.Sprintf("base64://%s", encodeBase64(data))
-	mb.elements = append(mb.elements, &botc.MessageElement{
-		Type:   botc.ImageElement,
-		Source: encoded,
-	})
+	mb.ImageFromUrl(encoded)
 	return mb
 }
 
 func (mb *MessageBuilder) ReplyTo(ctx botc.MessageContext) (*botc.BaseMessage, error) {
+	if mb.err != nil {
+		return nil, mb.err
+	}
 	// Get the message context and reply appropriately
 	msg := ctx.Message()
 
@@ -96,6 +124,9 @@ func (mb *MessageBuilder) ReplyTo(ctx botc.MessageContext) (*botc.BaseMessage, e
 }
 
 func (mb *MessageBuilder) Send(id string) (*botc.BaseMessage, error) {
+	if mb.err != nil {
+		return nil, mb.err
+	}
 	// Parse ID to determine if it's a user or group
 	if strings.HasPrefix(id, "onebot:") {
 		// Remove prefix for parsing
@@ -118,6 +149,9 @@ func (mb *MessageBuilder) Send(id string) (*botc.BaseMessage, error) {
 // Additional helper methods for OneBot-specific functionality
 
 func (mb *MessageBuilder) Voice(url string) botc.MessageBuilder {
+	if mb.err != nil {
+		return mb
+	}
 	mb.elements = append(mb.elements, &botc.MessageElement{
 		Type:   botc.VoiceElement,
 		Source: url,
@@ -126,6 +160,9 @@ func (mb *MessageBuilder) Voice(url string) botc.MessageBuilder {
 }
 
 func (mb *MessageBuilder) Video(url string) botc.MessageBuilder {
+	if mb.err != nil {
+		return mb
+	}
 	mb.elements = append(mb.elements, &botc.MessageElement{
 		Type:   botc.VideoElement,
 		Source: url,
@@ -138,6 +175,9 @@ func (mb *MessageBuilder) At(target string) botc.MessageBuilder {
 }
 
 func (mb *MessageBuilder) Face(id string) botc.MessageBuilder {
+	if mb.err != nil {
+		return mb
+	}
 	mb.elements = append(mb.elements, &botc.MessageElement{
 		Type:    botc.StickerElement,
 		Content: id,
@@ -146,6 +186,9 @@ func (mb *MessageBuilder) Face(id string) botc.MessageBuilder {
 }
 
 func (mb *MessageBuilder) Reply(messageID string) botc.MessageBuilder {
+	if mb.err != nil {
+		return mb
+	}
 	mb.elements = append(mb.elements, &botc.MessageElement{
 		Type:    botc.QuoteElement,
 		Content: messageID,
@@ -154,6 +197,9 @@ func (mb *MessageBuilder) Reply(messageID string) botc.MessageBuilder {
 }
 
 func (mb *MessageBuilder) File(url string) botc.MessageBuilder {
+	if mb.err != nil {
+		return mb
+	}
 	mb.elements = append(mb.elements, &botc.MessageElement{
 		Type:   botc.FileElement,
 		Source: url,
