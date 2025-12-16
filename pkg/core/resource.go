@@ -30,12 +30,12 @@ type Resource struct {
 
 // ResourceDownloader 由各协议适配器实现，用于根据 refLink 下载资源到本地
 // SaveResourceLink 存储资源引用并返回生成的资源 ID
-func (i *Instant) SaveResourceLink(protocol string, refLink string) string {
+func (i *Instant) SaveResourceLink(contextID string, refLink string) string {
 	id := uuid.NewString()
 	now := time.Now()
 	res := Resource{
 		ID:         id,
-		Protocol:   protocol,
+		Protocol:   contextID,
 		RefLink:    refLink,
 		Downloaded: now,
 	}

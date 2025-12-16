@@ -96,7 +96,7 @@ func (m *MessageBuilder) ImageFromUrl(url string) botc.MessageBuilder {
 		"url": {url},
 		"ext": {strings.TrimPrefix(path.Ext(url), ".")},
 	}.Encode()
-	id := m.service.grb.SaveResourceLink(m.Protocol(), refLink)
+	id := m.service.grb.SaveResourceLink(m.service.ID(), refLink)
 	if pathStr, err := m.service.grb.LoadResourceFromID(id); err == nil {
 		if data, err := os.ReadFile(pathStr); err == nil {
 			m.ImageFromData(data)
@@ -124,7 +124,7 @@ func (m *MessageBuilder) VideoFromUrl(url string) *MessageBuilder {
 		"url": {url},
 		"ext": {strings.TrimPrefix(path.Ext(url), ".")},
 	}.Encode()
-	id := m.service.grb.SaveResourceLink(m.Protocol(), refLink)
+	id := m.service.grb.SaveResourceLink(m.service.ID(), refLink)
 	if pathStr, err := m.service.grb.LoadResourceFromID(id); err == nil {
 		if data, err := os.ReadFile(pathStr); err == nil {
 			m.VideoFromData(data)
@@ -152,7 +152,7 @@ func (m *MessageBuilder) VoiceFromUrl(url string) *MessageBuilder {
 		"url": {url},
 		"ext": {strings.TrimPrefix(path.Ext(url), ".")},
 	}.Encode()
-	id := m.service.grb.SaveResourceLink(m.Protocol(), refLink)
+	id := m.service.grb.SaveResourceLink(m.service.ID(), refLink)
 	if pathStr, err := m.service.grb.LoadResourceFromID(id); err == nil {
 		if data, err := os.ReadFile(pathStr); err == nil {
 			m.VoiceFromData(data)

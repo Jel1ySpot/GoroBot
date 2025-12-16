@@ -44,21 +44,21 @@ func (m *Message) ToBase(grb *GoroBot.Instant) *botc.BaseMessage {
 				"url": {attachment.URL},
 				"ext": {strings.TrimPrefix(path.Ext(attachment.URL), ".")},
 			}.Encode()
-			id := grb.SaveResourceLink("qbot", refLink)
+			id := grb.SaveResourceLink(m.service.ID(), refLink)
 			b.Append(botc.ImageElement, "[图片]", id)
 		} else if strings.HasPrefix(attachment.ContentType, "video") {
 			refLink := urlpkg.Values{
 				"url": {attachment.URL},
 				"ext": {strings.TrimPrefix(path.Ext(attachment.URL), ".")},
 			}.Encode()
-			id := grb.SaveResourceLink("qbot", refLink)
+			id := grb.SaveResourceLink(m.service.ID(), refLink)
 			b.Append(botc.VideoElement, "[视频]", id)
 		} else if strings.HasPrefix(attachment.ContentType, "voice") {
 			refLink := urlpkg.Values{
 				"url": {attachment.URL},
 				"ext": {strings.TrimPrefix(path.Ext(attachment.URL), ".")},
 			}.Encode()
-			id := grb.SaveResourceLink("qbot", refLink)
+			id := grb.SaveResourceLink(m.service.ID(), refLink)
 			b.Append(botc.VoiceElement, "[语音]", id)
 		}
 	}

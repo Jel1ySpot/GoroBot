@@ -523,7 +523,7 @@ func (s *Service) saveImageResource(url string) string {
 		"ext": {strings.TrimPrefix(path.Ext(url), ".")},
 	}.Encode()
 
-	resourceID := s.grb.SaveResourceLink(s.Protocol(), refLink)
+	resourceID := s.grb.SaveResourceLink(s.getContext().ID(), refLink)
 	s.logger.Debug("Saved image resource link: %s -> %s", url, resourceID)
 	return resourceID
 }
@@ -538,7 +538,7 @@ func (s *Service) saveVoiceResource(url string) string {
 		"ext": {strings.TrimPrefix(path.Ext(url), ".")},
 	}.Encode()
 
-	resourceID := s.grb.SaveResourceLink(s.Protocol(), refLink)
+	resourceID := s.grb.SaveResourceLink(s.getContext().ID(), refLink)
 	s.logger.Debug("Saved voice resource link: %s -> %s", url, resourceID)
 	return resourceID
 }
@@ -553,7 +553,7 @@ func (s *Service) saveVideoResource(url string) string {
 		"ext": {strings.TrimPrefix(path.Ext(url), ".")},
 	}.Encode()
 
-	resourceID := s.grb.SaveResourceLink(s.Protocol(), refLink)
+	resourceID := s.grb.SaveResourceLink(s.getContext().ID(), refLink)
 	s.logger.Debug("Saved video resource link: %s -> %s", url, resourceID)
 	return resourceID
 }
