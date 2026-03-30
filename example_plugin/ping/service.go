@@ -23,6 +23,7 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 	s.bot = grb
 
 	delFn, _ := grb.Command("ping").
+		Description("Ping 测试").
 		Alias("^ping$", nil).
 		Action(func(ctx *command.Context) error {
 			_, _ = ctx.ReplyText("🏓")
