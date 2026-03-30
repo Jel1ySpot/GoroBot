@@ -9,36 +9,36 @@ import (
 
 type System struct {
 	Commands map[string]*Registry
-	mu       sync.Mutex
+	Mu       sync.Mutex
 }
 
 func NewCommandSystem() *System {
 	return &System{
 		Commands: make(map[string]*Registry),
-		mu:       sync.Mutex{},
+		Mu:       sync.Mutex{},
 	}
 }
 
 func (s *System) Register(registry Registry) func() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.Mu.Lock()
+	defer s.Mu.Unlock()
 	id := uuid.New()
 	copy := registry
 	s.Commands[id.String()] = &copy
 	return func() {
-		s.mu.Lock()
-		defer s.mu.Unlock()
+		s.Mu.Lock()
+		defer s.Mu.Unlock()
 		delete(s.Commands, id.String())
 	}
 }
 
 func (s *System) Emit(cmdCtx *Context) {
-	s.mu.Lock()
+	s.Mu.Lock()
 	registries := make([]*Registry, 0, len(s.Commands))
 	for _, registry := range s.Commands {
 		registries = append(registries, registry)
 	}
-	s.mu.Unlock()
+	s.Mu.Unlock()
 
 	for _, registry := range registries {
 		ctx := cmdCtx.Clone()
