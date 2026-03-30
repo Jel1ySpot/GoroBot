@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/Jel1ySpot/GoroBot/example_plugin/dice"
+	"github.com/Jel1ySpot/GoroBot/example_plugin/go_plugin"
 	"github.com/Jel1ySpot/GoroBot/example_plugin/message_logger"
 	"github.com/Jel1ySpot/GoroBot/example_plugin/ping"
 	"github.com/Jel1ySpot/GoroBot/example_plugin/tests"
@@ -19,15 +19,15 @@ func onebot_example() {
 		panic(err)
 	}
 
-	// Create OneBot service
+	// Create OneBot dice
 	onebot := OneBotClient.Create()
 
 	// Use the services
 	grb.Use(onebot)
 	grb.Use(message_logger.Create())
 	grb.Use(ping.Create())
-	grb.Use(dice.Create())
 	grb.Use(tests.Create())
+	grb.Use(go_plugin.Create())
 
 	// Example: Echo bot that responds to "ping" with "pong"
 	var del func()
