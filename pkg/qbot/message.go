@@ -1,14 +1,15 @@
 package qbot
 
 import (
-	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
-	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
-	"github.com/tencent-connect/botgo/dto"
 	urlpkg "net/url"
 	"path"
 	"strings"
 	"unsafe"
+
+	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
+	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
+	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
+	"github.com/tencent-connect/botgo/dto"
 )
 
 const (
@@ -18,6 +19,7 @@ const (
 )
 
 type Message struct {
+	ctx   *Service
 	event *dto.WSPayload
 	data  *dto.Message
 }
@@ -44,21 +46,21 @@ func (m *Message) ToBase(grb *GoroBot.Instant) *botc.BaseMessage {
 				"url": {attachment.URL},
 				"ext": {strings.TrimPrefix(path.Ext(attachment.URL), ".")},
 			}.Encode()
-			id := grb.SaveResourceLink(m.service.ID(), refLink)
+			id := grb.SaveResourceLink(m.ctx.ID(), refLink)
 			b.Append(botc.ImageElement, "[图片]", id)
 		} else if strings.HasPrefix(attachment.ContentType, "video") {
 			refLink := urlpkg.Values{
 				"url": {attachment.URL},
 				"ext": {strings.TrimPrefix(path.Ext(attachment.URL), ".")},
 			}.Encode()
-			id := grb.SaveResourceLink(m.service.ID(), refLink)
+			id := grb.SaveResourceLink(m.ctx.ID(), refLink)
 			b.Append(botc.VideoElement, "[视频]", id)
 		} else if strings.HasPrefix(attachment.ContentType, "voice") {
 			refLink := urlpkg.Values{
 				"url": {attachment.URL},
 				"ext": {strings.TrimPrefix(path.Ext(attachment.URL), ".")},
 			}.Encode()
-			id := grb.SaveResourceLink(m.service.ID(), refLink)
+			id := grb.SaveResourceLink(m.ctx.ID(), refLink)
 			b.Append(botc.VoiceElement, "[语音]", id)
 		}
 	}

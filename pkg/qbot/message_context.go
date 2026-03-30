@@ -3,12 +3,13 @@ package qbot
 import (
 	"context"
 	"fmt"
+
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/tencent-connect/botgo/dto"
 )
 
 type MessageContext struct {
-	bot     *Context
+	bot     *Service
 	message *Message
 }
 
@@ -25,7 +26,7 @@ func (m *MessageContext) String() string {
 }
 
 func (m *MessageContext) Message() *botc.BaseMessage {
-	return m.message.ToBase(m.bot.Service.grb)
+	return m.message.ToBase(m.bot.grb)
 }
 
 func (m *MessageContext) SenderID() string {
@@ -33,7 +34,7 @@ func (m *MessageContext) SenderID() string {
 }
 
 func (m *MessageContext) NewMessageBuilder() botc.MessageBuilder {
-	return NewMessageBuilder(m, m.bot.Service)
+	return NewMessageBuilder(m)
 }
 
 func (m *MessageContext) Reply(elements []*botc.MessageElement) (*botc.BaseMessage, error) {

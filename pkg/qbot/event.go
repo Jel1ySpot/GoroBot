@@ -1,10 +1,11 @@
 package qbot
 
 import (
+	"strings"
+
 	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
 	"github.com/tencent-connect/botgo/dto"
 	"github.com/tencent-connect/botgo/event"
-	"strings"
 )
 
 func (s *Service) registerHandlers() {
@@ -31,15 +32,15 @@ func (s *Service) emitMessage(event *dto.WSPayload, data *dto.Message) error {
 		return s.emitCommand(event, data)
 	}
 	return s.grb.MessageEmit(&MessageContext{
-		NewContext(s),
-		&Message{event, data},
+		s,
+		&Message{s, event, data},
 	})
 }
 
 func (s *Service) emitCommand(event *dto.WSPayload, data *dto.Message) error {
 	s.grb.CommandEmit(command.NewCommandContext(&MessageContext{
-		NewContext(s),
-		&Message{event, data},
+		s,
+		&Message{s, event, data},
 	}, data.Content[1:]))
 	return nil
 }

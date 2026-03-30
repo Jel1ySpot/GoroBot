@@ -3,15 +3,16 @@ package qbot
 import (
 	"context"
 	"fmt"
-	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
-	"github.com/tencent-connect/botgo/dto"
 	urlpkg "net/url"
 	"os"
 	"path"
 	"strings"
 	"time"
+
+	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
+	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
+	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
+	"github.com/tencent-connect/botgo/dto"
 )
 
 type MessageBuilder struct {
@@ -19,14 +20,14 @@ type MessageBuilder struct {
 	fromMsg   *MessageContext
 	MediaData []byte
 	MediaType uint64
-	service   *Service
+	ctx       *Service
 }
 
-func NewMessageBuilder(from *MessageContext, service *Service) *MessageBuilder {
+func NewMessageBuilder(from *MessageContext) *MessageBuilder {
 	return &MessageBuilder{
 		MessageToCreate: &dto.MessageToCreate{},
 		fromMsg:         from,
-		service:         service,
+		ctx:             from.bot,
 	}
 }
 
@@ -65,16 +66,16 @@ func (m *MessageBuilder) Mention(id string) botc.MessageBuilder {
 }
 
 func (m *MessageBuilder) CmdEnter(text string) *MessageBuilder {
-	m.Text(fmt.Sprintf("<qqbot-cmd-enter text=\"%s\" /> ", url.QueryEscape(text)))
+	m.Text(fmt.Sprintf("<qqbot-cmd-enter text=\"%s\" /> ", urlpkg.QueryEscape(text)))
 	return m
 }
 
 func (m *MessageBuilder) CmdInput(text, show string, reference bool) *MessageBuilder {
 	if show != "" {
-		show = fmt.Sprintf("show=\"%s\" ", url.QueryEscape(show))
+		show = fmt.Sprintf("show=\"%s\" ", urlpkg.QueryEscape(show))
 	}
 
-	m.Text(fmt.Sprintf("<qqbot-cmd-input text=\"%s\" %sreference=\"%t\" /> ", url.QueryEscape(text), show, reference))
+	m.Text(fmt.Sprintf("<qqbot-cmd-input text=\"%s\" %sreference=\"%t\" /> ", urlpkg.QueryEscape(text), show, reference))
 	return m
 }
 
@@ -96,8 +97,8 @@ func (m *MessageBuilder) ImageFromUrl(url string) botc.MessageBuilder {
 		"url": {url},
 		"ext": {strings.TrimPrefix(path.Ext(url), ".")},
 	}.Encode()
-	id := m.service.grb.SaveResourceLink(m.service.ID(), refLink)
-	if pathStr, err := m.service.grb.LoadResourceFromID(id); err == nil {
+	id := m.ctx.grb.SaveResourceLink(m.ctx.ID(), refLink)
+	if pathStr, err := m.ctx.grb.LoadResourceFromID(id); err == nil {
 		if data, err := os.ReadFile(pathStr); err == nil {
 			m.ImageFromData(data)
 		}
@@ -124,8 +125,8 @@ func (m *MessageBuilder) VideoFromUrl(url string) *MessageBuilder {
 		"url": {url},
 		"ext": {strings.TrimPrefix(path.Ext(url), ".")},
 	}.Encode()
-	id := m.service.grb.SaveResourceLink(m.service.ID(), refLink)
-	if pathStr, err := m.service.grb.LoadResourceFromID(id); err == nil {
+	id := m.ctx.grb.SaveResourceLink(m.ctx.ID(), refLink)
+	if pathStr, err := m.ctx.grb.LoadResourceFromID(id); err == nil {
 		if data, err := os.ReadFile(pathStr); err == nil {
 			m.VideoFromData(data)
 		}
@@ -152,8 +153,8 @@ func (m *MessageBuilder) VoiceFromUrl(url string) *MessageBuilder {
 		"url": {url},
 		"ext": {strings.TrimPrefix(path.Ext(url), ".")},
 	}.Encode()
-	id := m.service.grb.SaveResourceLink(m.service.ID(), refLink)
-	if pathStr, err := m.service.grb.LoadResourceFromID(id); err == nil {
+	id := m.ctx.grb.SaveResourceLink(m.ctx.ID(), refLink)
+	if pathStr, err := m.ctx.grb.LoadResourceFromID(id); err == nil {
 		if data, err := os.ReadFile(pathStr); err == nil {
 			m.VoiceFromData(data)
 		}
@@ -193,7 +194,7 @@ func (m *MessageBuilder) ReplyTo(msg botc.MessageContext) (*botc.BaseMessage, er
 	}
 
 	if err := m.prePostMedia(id); err != nil {
-		m.service.logger.Warning("post media failed: %v", err)
+		m.ctx.logger.Warning("post media failed: %v", err)
 	}
 
 	return msg.(*MessageContext).reply(m.Build())
@@ -203,7 +204,7 @@ func (m *MessageBuilder) prePostMedia(id string) error {
 	if m.MediaData == nil {
 		return nil
 	}
-	if data, err := m.service.UploadFileData(id, m.MediaType, m.MediaData); err == nil {
+	if data, err := m.ctx.UploadFileData(id, m.MediaType, m.MediaData); err == nil {
 		info := dto.MediaInfo{
 			FileInfo: data.FileInfo,
 		}
@@ -216,7 +217,7 @@ func (m *MessageBuilder) prePostMedia(id string) error {
 
 func (m *MessageBuilder) Send(id string) (*botc.BaseMessage, error) {
 	if err := m.prePostMedia(id); err != nil {
-		m.service.logger.Warning("post media failed: %v", err)
+		m.ctx.logger.Warning("post media failed: %v", err)
 	}
 
 	info, ok := entity.ParseInfo(id)
@@ -227,32 +228,32 @@ func (m *MessageBuilder) Send(id string) (*botc.BaseMessage, error) {
 
 	switch idType {
 	case "user":
-		data, err := m.service.api.PostC2CMessage(context.Background(), id, m.Build())
+		data, err := m.ctx.api.PostC2CMessage(context.Background(), id, m.Build())
 		if err != nil {
 			return nil, err
 		}
 		msg := Message{
 			data: data,
 		}
-		return msg.ToBase(m.service.grb), nil
+		return msg.ToBase(m.ctx.grb), nil
 	case "group":
-		data, err := m.service.api.PostGroupMessage(context.Background(), id, m.Build())
+		data, err := m.ctx.api.PostGroupMessage(context.Background(), id, m.Build())
 		if err != nil {
 			return nil, err
 		}
 		msg := Message{
 			data: data,
 		}
-		return msg.ToBase(m.service.grb), nil
+		return msg.ToBase(m.ctx.grb), nil
 	case "channel":
-		data, err := m.service.api.PostMessage(context.Background(), id, m.Build())
+		data, err := m.ctx.api.PostMessage(context.Background(), id, m.Build())
 		if err != nil {
 			return nil, err
 		}
 		msg := Message{
 			data: data,
 		}
-		return msg.ToBase(m.service.grb), nil
+		return msg.ToBase(m.ctx.grb), nil
 	}
 	return nil, fmt.Errorf("invalid id type %s", idType)
 }

@@ -14,6 +14,7 @@ import (
 
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
+	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/logger"
 	"github.com/Jel1ySpot/conic"
 	"github.com/google/uuid"
@@ -68,7 +69,7 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 		return err
 	}
 
-	grb.AddContext(NewContext(s))
+	grb.AddContext(s)
 
 	return nil
 }
@@ -78,8 +79,44 @@ func (s *Service) Release(grb *GoroBot.Instant) error {
 	return nil
 }
 
+func (s *Service) ID() string {
+	u, err := s.api.Me(context.Background())
+	if err != nil {
+		return fmt.Sprintf("%s:%s", s.Protocol(), s.config.Credentials.AppID)
+	}
+	return fmt.Sprintf("%s:%s", s.Protocol(), u.ID)
+}
+
 func (s *Service) Protocol() string {
 	return "qbot"
+}
+
+func (s *Service) Status() botc.LoginStatus {
+	return s.status
+}
+
+func (s *Service) NewMessageBuilder() botc.MessageBuilder {
+	return NewMessageBuilder(&MessageContext{
+		bot: s,
+	})
+}
+
+func (s *Service) SendDirectMessage(target entity.User, elements []*botc.MessageElement) (*botc.BaseMessage, error) {
+	//TODO implement me
+	return nil, nil
+}
+
+func (s *Service) SendGroupMessage(target entity.Group, elements []*botc.MessageElement) (*botc.BaseMessage, error) {
+	//TODO implement me
+	return nil, nil
+}
+
+func (s *Service) Contacts() []entity.User {
+	return nil
+}
+
+func (s *Service) Groups() []entity.Group {
+	return nil
 }
 
 func (s *Service) DownloadResourceFromRefLink(refLink string) (string, error) {
