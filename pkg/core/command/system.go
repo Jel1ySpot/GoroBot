@@ -8,43 +8,67 @@ import (
 )
 
 type System struct {
-	Commands map[string]*Registry
-	Mu       sync.Mutex
+	commands map[string]*Registry
+	mu       sync.RWMutex
 }
 
 func NewCommandSystem() *System {
 	return &System{
-		Commands: make(map[string]*Registry),
-		Mu:       sync.Mutex{},
+		commands: make(map[string]*Registry),
 	}
 }
 
 func (s *System) Register(registry Registry) func() {
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	id := uuid.New()
 	copy := registry
-	s.Commands[id.String()] = &copy
+	s.commands[id.String()] = &copy
 	return func() {
-		s.Mu.Lock()
-		defer s.Mu.Unlock()
-		delete(s.Commands, id.String())
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		delete(s.commands, id.String())
 	}
 }
 
 func (s *System) Emit(cmdCtx *Context) {
-	s.Mu.Lock()
-	registries := make([]*Registry, 0, len(s.Commands))
-	for _, registry := range s.Commands {
+	s.mu.RLock()
+	registries := make([]*Registry, 0, len(s.commands))
+	for _, registry := range s.commands {
 		registries = append(registries, registry)
 	}
-	s.Mu.Unlock()
+	s.mu.RUnlock()
 
 	for _, registry := range registries {
 		ctx := cmdCtx.Clone()
 		if err := registry.handle(ctx); err != nil && err.Error() != "unmatched command" {
 			_, _ = ctx.ReplyText(err.Error())
 		}
+	}
+}
+
+// GetSchemas 返回所有已注册的顶级命令 Schema
+func (s *System) GetSchemas() []Schema {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	schemas := make([]Schema, 0, len(s.commands))
+	for _, reg := range s.commands {
+		schemas = append(schemas, reg.Schema)
+	}
+	return schemas
+}
+
+// CheckAliases 遍历所有已注册命令检查别名匹配
+func (s *System) CheckAliases(ctx *Context) {
+	s.mu.RLock()
+	registries := make([]*Registry, 0, len(s.commands))
+	for _, reg := range s.commands {
+		registries = append(registries, reg)
+	}
+	s.mu.RUnlock()
+
+	for _, reg := range registries {
+		reg.CheckAlias(ctx.Clone())
 	}
 }
 

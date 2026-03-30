@@ -37,11 +37,7 @@ func (i *Instant) EventEmit(eventName string, args ...interface{}) error {
 func (i *Instant) MessageEmit(msg botc.MessageContext) error {
 	// 中间件
 	return i.middleware.dispatch(msg, func() error {
-		go func() {
-			for _, cmdReg := range i.commands.Commands {
-				cmdReg.CheckAlias(command.NewCommandContext(msg, msg.String()))
-			}
-		}()
+		go i.commands.CheckAliases(command.NewCommandContext(msg, msg.String()))
 		return i.event.Emit("message", msg)
 	})
 }
