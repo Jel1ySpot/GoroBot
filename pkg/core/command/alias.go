@@ -3,7 +3,7 @@ package command
 func (r *Registry) CheckAlias(ctx *Context) {
 	for _, alias := range r.Aliases {
 		if alias.pattern.MatchString(ctx.String()) {
-			target := ctx.Clone()
+			target := ctx.Clone().setSchema(&r.Schema)
 			if alias.transform != nil {
 				target = alias.transform(target)
 			}

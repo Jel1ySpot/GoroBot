@@ -52,7 +52,7 @@ func (r *Registry) Emit(cmdCtx *Context) error { // 触发指令Reg
 	if r.Handler == nil {
 		return fmt.Errorf("unmatched command")
 	}
-	return r.Handler(cmdCtx)
+	return r.Handler(cmdCtx.setSchema(&r.Schema))
 }
 
 func (r *Registry) handle(cmdCtx *Context) error {
