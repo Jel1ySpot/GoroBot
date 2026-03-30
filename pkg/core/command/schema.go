@@ -6,6 +6,7 @@ type InputType string
 
 type Schema struct {
 	Name              string
+	Description       string
 	Options           []SchemaOption
 	Arguments         []SchemaArgument
 	SubCommandSchemas []Schema

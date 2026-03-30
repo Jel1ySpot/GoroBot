@@ -39,6 +39,11 @@ func (f *FormatBuilder) SubCommand(name string) *FormatBuilder {
 	return child
 }
 
+func (f *FormatBuilder) Description(desc string) *FormatBuilder {
+	f.registry.Schema.Description = desc
+	return f
+}
+
 func (f *FormatBuilder) Option(name string, shortName string, inputType InputType, required bool, Default string, help string) *FormatBuilder {
 	if f.err != nil {
 		return f
