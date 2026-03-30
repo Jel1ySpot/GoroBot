@@ -31,16 +31,10 @@ func (s *Service) emitMessage(event *dto.WSPayload, data *dto.Message) error {
 	if strings.HasPrefix(data.Content, "/") {
 		return s.emitCommand(event, data)
 	}
-	return s.grb.MessageEmit(&MessageContext{
-		s,
-		&Message{s, event, data},
-	})
+	return s.grb.MessageEmit(NewMessageContext(s, event, data))
 }
 
 func (s *Service) emitCommand(event *dto.WSPayload, data *dto.Message) error {
-	s.grb.CommandEmit(command.NewCommandContext(&MessageContext{
-		s,
-		&Message{s, event, data},
-	}, data.Content[1:]))
+	s.grb.CommandEmit(command.NewCommandContext(NewMessageContext(s, event, data), data.Content[1:]))
 	return nil
 }

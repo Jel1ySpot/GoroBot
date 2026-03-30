@@ -232,28 +232,19 @@ func (m *MessageBuilder) Send(id string) (*botc.BaseMessage, error) {
 		if err != nil {
 			return nil, err
 		}
-		msg := Message{
-			data: data,
-		}
-		return msg.ToBase(m.ctx.grb), nil
+		return ParseMessage(m.ctx.grb, m.ctx, data), nil
 	case "group":
 		data, err := m.ctx.api.PostGroupMessage(context.Background(), id, m.Build())
 		if err != nil {
 			return nil, err
 		}
-		msg := Message{
-			data: data,
-		}
-		return msg.ToBase(m.ctx.grb), nil
+		return ParseMessage(m.ctx.grb, m.ctx, data), nil
 	case "channel":
 		data, err := m.ctx.api.PostMessage(context.Background(), id, m.Build())
 		if err != nil {
 			return nil, err
 		}
-		msg := Message{
-			data: data,
-		}
-		return msg.ToBase(m.ctx.grb), nil
+		return ParseMessage(m.ctx.grb, m.ctx, data), nil
 	}
 	return nil, fmt.Errorf("invalid id type %s", idType)
 }
