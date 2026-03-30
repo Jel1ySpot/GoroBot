@@ -1,10 +1,11 @@
 package lagrange
 
 import (
+	"strings"
+
 	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
 	"github.com/LagrangeDev/LagrangeGo/client"
 	LgrMessage "github.com/LagrangeDev/LagrangeGo/message"
-	"strings"
 )
 
 func (s *Service) eventSubscribe() error {
