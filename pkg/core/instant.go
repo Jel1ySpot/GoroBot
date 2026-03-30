@@ -3,15 +3,17 @@ package GoroBot
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/event"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/logger"
 	"github.com/Jel1ySpot/GoroBot/pkg/util"
 	"github.com/Jel1ySpot/conic"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 const (
@@ -19,11 +21,13 @@ const (
 )
 
 type Instant struct {
-	services []Service
-	logger   logger.Inst
-	db       *sql.DB
-	contexts map[string]botc.BotContext
-	config   Config
+	services   []Service
+	servicesMu sync.RWMutex
+	logger     logger.Inst
+	db         *sql.DB
+	contexts   map[string]botc.BotContext
+	contextsMu sync.RWMutex
+	config     Config
 
 	event      *event.System
 	middleware *MiddlewareSystem
@@ -73,6 +77,8 @@ func (i *Instant) GetOwner(id string) (owner string, ok bool) {
 }
 
 func (i *Instant) Use(service Service) {
+	i.servicesMu.Lock()
+	defer i.servicesMu.Unlock()
 	i.services = append(i.services, service)
 }
 
@@ -82,12 +88,25 @@ func (i *Instant) Remove(service Service) error {
 		i.logger.Failed("Failed to remove service %s: %s", service.Name(), err.Error())
 		return err
 	}
+	i.servicesMu.Lock()
+	for idx, s := range i.services {
+		if s == service {
+			i.services = append(i.services[:idx], i.services[idx+1:]...)
+			break
+		}
+	}
+	i.servicesMu.Unlock()
 	i.logger.Success("Removed service %s success", service.Name())
 	return nil
 }
 
 func (i *Instant) initServices() error {
-	for _, service := range i.services {
+	i.servicesMu.RLock()
+	services := make([]Service, len(i.services))
+	copy(services, i.services)
+	i.servicesMu.RUnlock()
+
+	for _, service := range services {
 		i.logger.Debug("Initializing service %s", service.Name())
 		if err := service.Init(i); err != nil {
 			i.logger.Failed("Failed to initialize service %s: %v", service.Name(), err)
@@ -99,7 +118,12 @@ func (i *Instant) initServices() error {
 }
 
 func (i *Instant) releaseServices() {
-	for _, service := range i.services {
+	i.servicesMu.RLock()
+	services := make([]Service, len(i.services))
+	copy(services, i.services)
+	i.servicesMu.RUnlock()
+
+	for _, service := range services {
 		i.logger.Debug("Releasing service %s", service.Name())
 		if err := service.Release(i); err != nil {
 			i.logger.Failed("Failed to release service %s: %v", service.Name(), err)
@@ -111,6 +135,8 @@ func (i *Instant) releaseServices() {
 
 func (i *Instant) AddContext(context botc.BotContext) bool {
 	i.logger.Debug("Adding %s bot context %s", context.Protocol(), context.ID())
+	i.contextsMu.Lock()
+	defer i.contextsMu.Unlock()
 	if _, ok := i.contexts[context.ID()]; ok {
 		i.logger.Failed("Duplicated bot context %s", context.ID())
 		return false
@@ -121,6 +147,8 @@ func (i *Instant) AddContext(context botc.BotContext) bool {
 }
 
 func (i *Instant) GetContext(protocol string) botc.BotContext {
+	i.contextsMu.RLock()
+	defer i.contextsMu.RUnlock()
 	if context, ok := i.contexts[protocol]; ok {
 		return context
 	}
@@ -128,6 +156,8 @@ func (i *Instant) GetContext(protocol string) botc.BotContext {
 }
 
 func (i *Instant) RemoveContext(protocol string) bool {
+	i.contextsMu.Lock()
+	defer i.contextsMu.Unlock()
 	if _, ok := i.contexts[protocol]; ok {
 		delete(i.contexts, protocol)
 		return true

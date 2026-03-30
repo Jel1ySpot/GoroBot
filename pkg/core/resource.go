@@ -81,7 +81,9 @@ func (i *Instant) LoadResourceFromID(id string) (string, error) {
 		return "", fmt.Errorf(res.Error)
 	}
 
+	i.contextsMu.RLock()
 	downloader, ok := i.contexts[res.Protocol]
+	i.contextsMu.RUnlock()
 	if !ok {
 		return "", fmt.Errorf("no downloader registered for protocol %s", res.Protocol)
 	}
