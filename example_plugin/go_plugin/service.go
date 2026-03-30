@@ -2,12 +2,20 @@ package go_plugin
 
 import (
 	"fmt"
+	"runtime"
+
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/logger"
-	"runtime"
 )
 
-const DefaultPluginPath = "plugin/"
+const (
+	DefaultPluginPath         = "plugins/"
+	PluginsListTemplateString = `插件列表：
+-------------------
+{{- range $Name, $Stat := .Plugins }}
+{{ $Name }}: {{ if $Stat }}✅{{ else }}❎{{ end }}
+{{- end }}`
+)
 
 type Service struct {
 	grb    *GoroBot.Instant
@@ -47,7 +55,7 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 		return fmt.Errorf("%s is not a supported platform", runtime.GOOS)
 	}
 
-	if err := s.LookupPlugins(); err != nil {
+	if _, err := s.LookupPlugins(); err != nil {
 		return err
 	}
 

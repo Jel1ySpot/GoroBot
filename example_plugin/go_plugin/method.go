@@ -2,14 +2,15 @@ package go_plugin
 
 import (
 	"fmt"
-	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
 	"plugin"
+
+	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
 )
 
-func (s *Service) LookupPlugins() error {
+func (s *Service) LookupPlugins() (int, error) {
 	plugins, err := ListPlugins(s.PluginPath)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	for _, name := range plugins {
@@ -18,7 +19,7 @@ func (s *Service) LookupPlugins() error {
 		}
 	}
 
-	return nil
+	return len(plugins), nil
 }
 
 func (s *Service) InitPlugins() {
@@ -87,10 +88,7 @@ func (s *Service) ReleasePlugin(name string) error {
 
 func (s *Service) EnablePlugin(name string) error {
 	if _, ok := s.pluginStat[name]; !ok {
-		_ = s.LookupPlugins()
-		if _, ok := s.pluginStat[name]; !ok {
-			return fmt.Errorf("plugin %s not found", name)
-		}
+		return fmt.Errorf("plugin %s not found", name)
 	}
 
 	stat := s.pluginStat[name]
