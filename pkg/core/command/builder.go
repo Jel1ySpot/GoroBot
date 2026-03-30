@@ -14,6 +14,7 @@ type FormatBuilder struct {
 	registry *Registry
 	parent   *FormatBuilder
 	err      error
+	release  func()
 }
 
 func NewCommandFormatBuilder(name string, system *System) *FormatBuilder {
@@ -90,13 +91,32 @@ func (f *FormatBuilder) Alias(pattern string, transform func(*Context) *Context)
 }
 
 func (f *FormatBuilder) Build() (func(), error) {
-	if f.err != nil {
-		return func() {}, f.err
+	root := f
+	for root.parent != nil {
+		root = root.parent
 	}
 
-	if f.parent != nil {
-		return func() {}, nil
+	if root.err != nil {
+		return func() {}, root.err
 	}
 
-	return f.system.Register(*f.registry), nil
+	// 如果已经注册过，先移除旧的注册，确保最新结构生效
+	if root.release != nil {
+		root.release()
+	}
+
+	reg := *root.registry
+	reg.Schema = syncSchema(root.registry)
+	root.release = root.system.Register(reg)
+	return root.release, nil
+}
+
+func syncSchema(reg *Registry) Schema {
+	schema := reg.Schema
+	schema.SubCommandSchemas = nil
+	for i := range reg.SubRegistries {
+		childSchema := syncSchema(&reg.SubRegistries[i])
+		schema.SubCommandSchemas = append(schema.SubCommandSchemas, childSchema)
+	}
+	return schema
 }
