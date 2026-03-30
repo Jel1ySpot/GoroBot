@@ -2,9 +2,15 @@ package go_plugin
 
 import (
 	"bytes"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
+	"fmt"
 	"strings"
 	"text/template"
+
+	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
+)
+
+var (
+	pluginsListTemplate *template.Template
 )
 
 func (s *Service) initCmd() {
@@ -13,90 +19,88 @@ func (s *Service) initCmd() {
 	cmd := grb.Command("plugin")
 
 	_, _ = cmd.SubCommand("lookup").
-		Action(func(ctx *command.Context) {
+		Action(func(ctx *command.Context) error {
 			if id, ok := grb.GetOwner(ctx.BotContext().ID()); ok && id != ctx.SenderID() {
 				_, _ = ctx.ReplyText("Permission denied.")
-				return
+				return nil
 			}
-			if err := s.LookupPlugins(); err != nil {
-				_, _ = ctx.ReplyText(err)
-				return
+			n, err := s.LookupPlugins()
+			if err != nil {
+				return err
 			}
 
-			_, _ = ctx.ReplyText("Done.")
+			_, _ = ctx.ReplyText("Done. Found ", n, " plugins.")
+			return nil
 		}).Build()
 
-	_, _ = cmd.SubCommand("load <name>").
-		Action(func(ctx *command.Context) {
+	_, _ = cmd.SubCommand("load").
+		Argument("name", command.String, true, "需要加载的插件").
+		Action(func(ctx *command.Context) error {
 			if id, ok := grb.GetOwner(ctx.BotContext().ID()); ok && id != ctx.SenderID() {
-				_, _ = ctx.ReplyText("Permission denied.")
-				return
+				return fmt.Errorf("permission denied")
 			}
-			name := ctx.Args["name"]
+			name := ctx.KvArgs["name"]
 			if strings.ToLower(name) == "all" {
 				for name, stat := range s.pluginStat {
 					if stat {
 						if err := s.ReleasePlugin(name); err != nil {
-							_, _ = ctx.ReplyText(err)
-							continue
+							_, _ = ctx.ReplyText("plugin ", name, " release failed with error: ", err.Error())
 						}
 					}
 					if err := s.InitPlugin(name); err != nil {
-						_, _ = ctx.ReplyText(err)
+						_, _ = ctx.ReplyText("plugin ", name, " initialization failed with error: ", err.Error())
 					}
 				}
 
 				_, _ = ctx.ReplyText("Done.")
-				return
+				return nil
 			}
 
 			if _, ok := s.pluginStat[name]; !ok {
-				_, _ = ctx.ReplyText("Plugin not found.")
-				return
+				return fmt.Errorf("plugin not found: %s", name)
 			}
 
 			if s.pluginStat[name] {
 				if err := s.ReleasePlugin(name); err != nil {
-					_, _ = ctx.ReplyText(err)
-					return
+					return err
 				}
 			}
 
 			if err := s.InitPlugin(name); err != nil {
-				_, _ = ctx.ReplyText(err)
-				return
+				return err
 			}
 
 			_, _ = ctx.ReplyText("Done.")
+			return nil
 		}).Build()
 
-	_, _ = cmd.SubCommand("enable <name>").
-		Action(func(ctx *command.Context) {
+	_, _ = cmd.SubCommand("enable").
+		Argument("name", command.String, true, "需要启用的插件").
+		Action(func(ctx *command.Context) error {
 			if id, ok := grb.GetOwner(ctx.BotContext().ID()); ok && id != ctx.SenderID() {
-				_, _ = ctx.ReplyText("Permission denied.")
-				return
+				return fmt.Errorf("permission denied")
 			}
-			name := ctx.Args["name"]
+			name := ctx.KvArgs["name"]
 			if strings.ToLower(name) == "all" {
 				s.InitPlugins()
 				_, _ = ctx.ReplyText("Done.")
-				return
+				return nil
 			}
 
 			if err := s.EnablePlugin(name); err != nil {
-				_, _ = ctx.ReplyText(err)
-				return
+				return fmt.Errorf("plugin enable failed: %s", err)
 			}
 			_, _ = ctx.ReplyText("Done.")
+			return nil
 		}).Build()
 
-	_, _ = cmd.SubCommand("disable <name>").
-		Action(func(ctx *command.Context) {
+	_, _ = cmd.SubCommand("disable").
+		Argument("name", command.String, true, "需要禁用的插件").
+		Action(func(ctx *command.Context) error {
 			if id, ok := grb.GetOwner(ctx.BotContext().ID()); ok && id != ctx.SenderID() {
-				_, _ = ctx.ReplyText("Permission denied.")
-				return
+				return fmt.Errorf("permission denied")
 			}
-			name := ctx.Args["name"]
+			name := ctx.KvArgs["name"]
 			if strings.ToLower(name) == "all" {
 				for name, stat := range s.pluginStat {
 					if stat == true {
@@ -106,37 +110,33 @@ func (s *Service) initCmd() {
 					}
 				}
 				_, _ = ctx.ReplyText("Done.")
-				return
+				return nil
 			}
 			if err := s.DisablePlugin(name); err != nil {
 				_, _ = ctx.ReplyText(err)
 			}
 			_, _ = ctx.ReplyText("Done.")
+			return nil
 		}).Build()
 
 	_, _ = cmd.SubCommand("list").
-		Action(func(ctx *command.Context) {
-			const temp = `插件列表：
-{{- range $Name, $Stat := .Plugins }}
-{{ $Name }}：
-{{- if $Stat -}}
-✅
-{{- else -}}
-❎
-{{- end -}}
-{{ end }}`
+		Action(func(ctx *command.Context) error {
 			var buf bytes.Buffer
 
-			if err := template.Must(template.New("temp").Parse(temp)).Execute(&buf, map[string]any{
+			if err := pluginsListTemplate.Execute(&buf, map[string]any{
 				"Plugins": s.pluginStat,
 			}); err != nil {
-				_, _ = ctx.ReplyText(err)
-				return
+				return err
 			}
 			_, _ = ctx.ReplyText(buf.String())
+			return nil
 		}).Build()
 
 	if _, err := cmd.Build(); err != nil {
 		s.logger.Failed("Failed to build command: %v", err)
 	}
+}
+
+func init() {
+	pluginsListTemplate = template.Must(template.New("pluginsListTemplate").Parse(PluginsListTemplateString))
 }
