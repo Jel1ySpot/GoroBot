@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/websocket"
 )
@@ -18,8 +19,16 @@ func (s *Service) startWebSocketServer() error {
 
 	mux := http.NewServeMux()
 
+	path := s.config.ReverseWebSocket.Path
+	if path == "" {
+		path = "/"
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+
 	// Handle API connections
-	mux.HandleFunc(s.config.ReverseWebSocket.Path, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			s.logger.Error("Failed to upgrade WebSocket: %v", err)
@@ -174,9 +183,12 @@ func (s *Service) handleUniversalWebSocket(conn *websocket.Conn) {
 					s.logger.Info("Universal WebSocket connection closed")
 					return
 				}
+				s.logger.Debug("Universal WebSocket read error detail: %v", err)
 				s.logger.Error("Universal WebSocket read error: %v", err)
 				return
 			}
+
+			s.logger.Debug("Universal WebSocket raw message: %s", string(message))
 
 			// Try to determine if this is an event or API response
 			var parsed map[string]interface{}
