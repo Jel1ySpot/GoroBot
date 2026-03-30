@@ -29,15 +29,11 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 	delFn, _ := grb.Command("dice").
 		Argument("upper_bound", command.Number, false, "骰子点数上限，默认为 6 （骰子点数范围 1 ~ Upper Bound）").
 		Alias(`^d(\d+)$`, func(ctx *command.Context) *command.Context {
-			ctx.KvArgs["upper_bound"] = ctx.String()[1:]
+			_ = ctx.AppendArg(ctx.String()[1:])
 			return ctx
 		}).
 		Action(func(ctx *command.Context) error {
-			limit, err := strconv.Atoi(ctx.KvArgs["upper_bound"])
-			if err != nil {
-				_, _ = ctx.ReplyText("无效的骰子点数上限: ", err.Error())
-				return err
-			}
+			limit := command.GetInt(ctx.KvArgs["upper_bound"])
 
 			if limit <= 0 {
 				_, _ = ctx.ReplyText("骰子点数上限必须大于 0")
