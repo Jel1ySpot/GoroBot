@@ -7,6 +7,7 @@ toolchain go1.24.2
 require (
 	github.com/Jel1ySpot/conic v0.0.4
 	github.com/LagrangeDev/LagrangeGo v0.1.4
+	github.com/go-telegram/bot v1.20.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
