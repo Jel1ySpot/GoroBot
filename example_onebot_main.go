@@ -19,7 +19,7 @@ func onebot_example() {
 		panic(err)
 	}
 
-	// Create OneBot dice
+	// Create OneBot service
 	onebot := OneBotClient.Create()
 
 	// Use the services
