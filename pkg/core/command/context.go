@@ -10,6 +10,9 @@ import (
 
 type Context struct {
 	botc.MessageContext
+
+	schema    *Schema
+	argIndex  int
 	argQueue  []string
 	raw       string
 	Commands  []string
@@ -26,12 +29,19 @@ func NewCommandContext(msg botc.MessageContext, text string) *Context {
 
 	return &Context{
 		MessageContext: msg,
+		argIndex:       0,
+		schema:         nil,
 		argQueue:       tokens,
 		raw:            text,
 		Arguments:      []string{},
 		KvArgs:         make(map[string]string),
 		Options:        make(map[string]string),
 	}
+}
+
+func (ctx *Context) setSchema(schema *Schema) *Context {
+	ctx.schema = schema
+	return ctx
 }
 
 func (ctx *Context) Clone() *Context {
@@ -51,6 +61,7 @@ func (ctx *Context) Clone() *Context {
 
 	return &Context{
 		MessageContext: ctx.MessageContext,
+		schema:         ctx.schema,
 		argQueue:       argQueue,
 		raw:            ctx.raw,
 		Commands:       commands,
@@ -58,6 +69,22 @@ func (ctx *Context) Clone() *Context {
 		KvArgs:         kvArgs,
 		Options:        options,
 	}
+}
+
+func (ctx *Context) AppendArg(value string) error {
+	if ctx.schema == nil {
+		return fmt.Errorf("schema is nil")
+	}
+	ctx.Arguments = append(ctx.Arguments, value)
+	if ctx.argIndex < len(ctx.schema.Arguments) {
+		arg := ctx.schema.Arguments[ctx.argIndex]
+		if !CheckInputType(value, arg.Type) {
+			return fmt.Errorf("argument '%s' expected type '%s', received '%s'", arg.Name, arg.Type, value)
+		}
+		ctx.KvArgs[arg.Name] = value
+	}
+	ctx.argIndex++
+	return nil
 }
 
 func (ctx *Context) processTokens(schema *Schema) error {
@@ -80,7 +107,8 @@ func (ctx *Context) processTokens(schema *Schema) error {
 	queue = queue[1:]
 
 	currentSchema := schema
-	argIndex := 0
+	ctx.schema = currentSchema
+	ctx.argIndex = 0
 
 	for len(queue) > 0 {
 		token := queue[0]
@@ -88,8 +116,9 @@ func (ctx *Context) processTokens(schema *Schema) error {
 		if s, ok := getSchemaFromSlice(&currentSchema.SubCommandSchemas, token); ok {
 			ctx.Commands = append(ctx.Commands, s.Name)
 			currentSchema = s
+			ctx.schema = currentSchema
 			queue = queue[1:]
-			argIndex = 0
+			ctx.argIndex = 0
 			continue
 		}
 
@@ -121,19 +150,14 @@ func (ctx *Context) processTokens(schema *Schema) error {
 			continue
 		}
 
-		ctx.Arguments = append(ctx.Arguments, token)
-		if argIndex < len(currentSchema.Arguments) {
-			arg := currentSchema.Arguments[argIndex]
-			if !CheckInputType(token, arg.Type) {
-				return fmt.Errorf("argument '%s' expected type '%s', received '%s'", arg.Name, arg.Type, token)
-			}
-			ctx.KvArgs[arg.Name] = token
+		err := ctx.AppendArg(token)
+		if err != nil {
+			return err
 		}
-		argIndex++
 		queue = queue[1:]
 	}
 
-	for i := argIndex; i < len(currentSchema.Arguments); i++ {
+	for i := ctx.argIndex; i < len(currentSchema.Arguments); i++ {
 		if currentSchema.Arguments[i].Required {
 			return fmt.Errorf("argument '%s' is required", currentSchema.Arguments[i].Name)
 		}
