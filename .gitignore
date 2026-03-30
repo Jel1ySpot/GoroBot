@@ -2,5 +2,13 @@
 /.idea
 
 /main.go
-/plugins
-/conf
+/build/plugins
+/build/conf
+/napcat-onebot
+
+# LLMs
+CLAUDE.md
+AGENTS.md
+.claude/
+.cursor/
+.github/copilot-instructions.md
