@@ -18,7 +18,7 @@ func genMessageID(chatID int64, msgID int) string {
 	return fmt.Sprintf("telegram:msg&%d&%d", chatID, msgID)
 }
 
-func parseChatID(id string) (int64, error) {
+func ParseChatID(id string) (int64, error) {
 	id = strings.TrimPrefix(id, "telegram:")
 	return strconv.ParseInt(id, 10, 64)
 }

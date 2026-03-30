@@ -145,7 +145,7 @@ func (m *MessageBuilder) Send(id string) (*botc.BaseMessage, error) {
 		id = strings.TrimPrefix(id, "telegram:")
 	}
 
-	chatID, err := parseChatID(id)
+	chatID, err := ParseChatID(id)
 	if err != nil {
 		return nil, err
 	}

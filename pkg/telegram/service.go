@@ -136,6 +136,11 @@ func (s *Service) handleUpdate(ctx context.Context, b *bot.Bot, update *models.U
 	}
 }
 
+// Bot 返回底层的 go-telegram/bot 实例，用于调用未封装的 Telegram API
+func (s *Service) Bot() *bot.Bot {
+	return s.bot
+}
+
 // SyncCommands 将已注册的命令同步到 Telegram 服务端
 func (s *Service) SyncCommands() {
 	schemas := s.grb.GetCommandSchemas()
@@ -188,7 +193,7 @@ func (s *Service) NewMessageBuilder() botc.MessageBuilder {
 }
 
 func (s *Service) SendDirectMessage(target entity.User, elements []*botc.MessageElement) (*botc.BaseMessage, error) {
-	chatID, err := parseChatID(target.ID)
+	chatID, err := ParseChatID(target.ID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid user id: %w", err)
 	}
@@ -196,7 +201,7 @@ func (s *Service) SendDirectMessage(target entity.User, elements []*botc.Message
 }
 
 func (s *Service) SendGroupMessage(target entity.Group, elements []*botc.MessageElement) (*botc.BaseMessage, error) {
-	chatID, err := parseChatID(target.ID)
+	chatID, err := ParseChatID(target.ID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid group id: %w", err)
 	}
