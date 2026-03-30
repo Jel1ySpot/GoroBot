@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+
 	"github.com/Jel1ySpot/GoroBot/example_plugin/message_logger"
 	"github.com/Jel1ySpot/GoroBot/example_plugin/ping"
 	"github.com/Jel1ySpot/GoroBot/example_plugin/tests"
@@ -8,6 +10,8 @@ import (
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
 	TelegramClient "github.com/Jel1ySpot/GoroBot/pkg/telegram"
+	"github.com/go-telegram/bot"
+	"github.com/go-telegram/bot/models"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -36,14 +40,37 @@ func telegram_example() {
 	}))
 
 	// 示例命令：/echo <content>
-	_command_del, _ := grb.Command("echo").
+	_, _ = grb.Command("echo").
+		Description("回声测试").
 		Argument("content", command.String, true, "").
 		Action(func(ctx *command.Context) error {
 			_, _ = ctx.ReplyText(ctx.KvArgs["content"])
 			return nil
 		}).Build()
 
-	_ = _command_del
+	// 关闭自定义键盘：/closekb
+	_, _ = grb.Command("closekb").
+		Description("关闭自定义键盘").
+		Action(func(ctx *command.Context) error {
+			msg := ctx.Message()
+			if msg.Sender == nil {
+				return nil
+			}
+			chatID := msg.Sender.From
+			if chatID == nil {
+				chatID = msg.Sender.Base
+			}
+			id, err := TelegramClient.ParseChatID(chatID.ID)
+			if err != nil {
+				return err
+			}
+			_, err = tg.Bot().SendMessage(context.Background(), &bot.SendMessageParams{
+				ChatID:      id,
+				Text:        "已关闭自定义键盘",
+				ReplyMarkup: &models.ReplyKeyboardRemove{RemoveKeyboard: true},
+			})
+			return err
+		}).Build()
 
 	if err := grb.Run(); err != nil {
 		panic(err)
