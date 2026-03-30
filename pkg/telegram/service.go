@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
@@ -87,6 +88,15 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 
 	go s.bot.Start(s.ctx)
 
+	// 延迟同步命令到 Telegram，等待其他插件完成命令注册
+	go func() {
+		select {
+		case <-time.After(3 * time.Second):
+			s.SyncCommands()
+		case <-s.ctx.Done():
+		}
+	}()
+
 	s.status = botc.Online
 	s.logger.Success("Telegram adapter 初始化完成，Bot: %s (@%s)", s.botName, s.botUsername)
 	return nil
@@ -124,6 +134,36 @@ func (s *Service) handleUpdate(ctx context.Context, b *bot.Bot, update *models.U
 	if err := s.grb.MessageEmit(msgCtx); err != nil {
 		s.logger.Error("触发 message 事件失败: %v", err)
 	}
+}
+
+// SyncCommands 将已注册的命令同步到 Telegram 服务端
+func (s *Service) SyncCommands() {
+	schemas := s.grb.GetCommandSchemas()
+
+	var cmds []models.BotCommand
+	for _, schema := range schemas {
+		desc := schema.Description
+		if desc == "" {
+			desc = schema.Name
+		}
+		cmds = append(cmds, models.BotCommand{
+			Command:     strings.ToLower(schema.Name),
+			Description: desc,
+		})
+	}
+
+	if len(cmds) == 0 {
+		return
+	}
+
+	_, err := s.bot.SetMyCommands(s.ctx, &bot.SetMyCommandsParams{
+		Commands: cmds,
+	})
+	if err != nil {
+		s.logger.Warning("同步命令到 Telegram 失败: %v", err)
+		return
+	}
+	s.logger.Info("已同步 %d 个命令到 Telegram", len(cmds))
 }
 
 // --- BotContext 接口实现 ---
