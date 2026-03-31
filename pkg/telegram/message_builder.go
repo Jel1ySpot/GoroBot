@@ -141,9 +141,7 @@ func (m *MessageBuilder) Send(id string) (*botc.BaseMessage, error) {
 		return nil, m.err
 	}
 
-	if strings.HasPrefix(id, "telegram:") {
-		id = strings.TrimPrefix(id, "telegram:")
-	}
+	id = strings.TrimPrefix(id, "telegram:")
 
 	chatID, err := ParseChatID(id)
 	if err != nil {
@@ -213,10 +211,7 @@ func firstImageSource(s *Service, elements []*botc.MessageElement) string {
 				source = p
 			}
 		}
-		if strings.HasPrefix(source, "file://") {
-			source = strings.TrimPrefix(source, "file://")
-		}
-		return source
+		return strings.TrimPrefix(source, "file://")
 	}
 	return ""
 }

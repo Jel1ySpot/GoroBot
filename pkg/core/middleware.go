@@ -1,9 +1,10 @@
 package GoroBot
 
 import (
+	"sync"
+
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/google/uuid"
-	"sync"
 )
 
 type MiddlewareCallback func(msg botc.MessageContext, next func(...MiddlewareCallback) error) error
@@ -42,9 +43,7 @@ func (sys *MiddlewareSystem) add(callback MiddlewareCallback, prepare bool) func
 		sys.mu.Lock()
 		defer sys.mu.Unlock()
 
-		if _, ok := sys.middlewares[id]; ok {
-			delete(sys.middlewares, id)
-		}
+		delete(sys.middlewares, id)
 	}
 }
 
