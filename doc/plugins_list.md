@@ -19,11 +19,21 @@
 基础的消息事件监听。将消息预览打印到日志。
 
 ### Ping
-> `import "github.com/Jel1ySpot/GoroBot/example_plugin/ping`
+> `import "github.com/Jel1ySpot/GoroBot/example_plugin/ping"`
 
-检测机器人连接状态，和一些调试命令
+检测机器人连接状态。发送 `ping` 或 `/ping` 回复 🏓。
+
+### 骰子
+> `import "github.com/Jel1ySpot/GoroBot/example_plugin/dice/dice"`
+
+掷骰子。支持 `/dice 20` 或别名 `d20` 的写法。
 
 ### 插件载入
-> `import "github.com/Jel1ySpot/GoroBot/example_plugin/go_plugin`
+> `import "github.com/Jel1ySpot/GoroBot/example_plugin/go_plugin"`
 
-载入外部插件（限类 Unix 系统）
+载入外部 `.so` 插件，支持加载/卸载/启用/禁用。限类 Unix 系统。
+
+### 调试工具
+> `import "github.com/Jel1ySpot/GoroBot/example_plugin/tests"`
+
+一些调试用的命令：`/repr`（输出消息 JSON）、`/getOwner`、`/getResourceFromID`、`/sendImage`。

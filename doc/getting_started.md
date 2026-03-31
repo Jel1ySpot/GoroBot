@@ -51,7 +51,7 @@ func main() {
 填写完成后再次启动，可以发现报错消失了，但控制台没有输出。这是因为这段代码没有载入任何逻辑代码。在这段代码中，我们创建了一个 GoroBot 实例（为了方便，在文档中会用 grb 代表 GoroBot 实例），并通过 `grb.Run()` 运行了它。
 
 ## 引入适配器
-GoroBot 框架使用适配器支持各种 IM 平台。具体支持列表见 [**支持平台**](index.md#支持平台)。适配器也是一种插件。让我们尝试引入一个适配器：
+GoroBot 框架使用适配器支持各种 IM 平台。适配器也是一种插件。让我们尝试引入一个适配器：
 ```go
 import LgrClient "github.com/Jel1ySpot/GoroBot/pkg/lagrange" // 引入模块
 
@@ -60,6 +60,17 @@ grb.Use(LgrClient.Create())
 ```
 插件使用 `Create()` 创建一个服务，我们可以使用 `grb.Use(*Service)` 来使用一个服务。运行这段代码，如无意外还需要填写配置文件，详细请见 [pkg/lagrange](https://github.com/Jel1ySpot/GoroBot/tree/master/pkg/lagrange)。
 配置好服务后再次运行，没有意外的话机器人服务就启动成功了。
+
+目前支持的适配器：
+
+| 适配器 | 导入路径 | 说明 |
+|--------|---------|------|
+| Lagrange | `pkg/lagrange` | QQ 平台 |
+| OneBot | `pkg/onebot` | OneBot 协议（WebSocket） |
+| QBot | `pkg/qbot` | QQ 官方机器人 |
+| Telegram | `pkg/telegram` | Telegram Bot API |
+
+每个适配器首次运行后会在 `conf/<adapter>/` 下生成配置文件，填写后重新启动即可。
 
 ## 使用插件
 同样是一个例子：
@@ -72,5 +83,8 @@ grb.Use(message_logger.Create())
 再次运行代码，尝试向机器人账号发送消息，如果控制台中出现了刚才发送的消息，代表框架已经搭建成功了！开始编写属于你自己的 IM Chatbot 吧！
 
 ## 接下来应该做什么
+- [事件系统](event.md) — 监听消息
+- [命令系统](command.md) — 注册命令
+- [插件系统](plugin.md) — 编写自己的插件
 - [插件列表](plugins_list.md)
 - [api 文档](api)
