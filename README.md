@@ -7,7 +7,7 @@ Go语言编写的跨平台聊天机器人框架
 - [x] QQ ([pkg/lagrange](https://github.com/Jel1ySpot/GoroBot/tree/master/pkg/lagrange))
 - [x] OneBot
 - [x] QQ Official ([pkg/qbot](https://github.com/Jel1ySpot/GoroBot/tree/master/pkg/qbot))
-- [ ] Telegram
+- [x] Telegram
 
 ## 特性
 - 高性能（我瞎说的反正 Go 怎么也比 Node 快）
