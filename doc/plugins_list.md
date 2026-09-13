@@ -33,6 +33,11 @@
 
 载入外部 `.so` 插件，支持加载/卸载/启用/禁用。限类 Unix 系统。
 
+### Wasm 插件引擎
+> `import "github.com/Jel1ySpot/GoroBot/pkg/wasm_plugin"`
+
+基于 Extism (wazero) 构建的跨平台安全沙箱插件系统。支持 Rust/TinyGo 等多语言编写，支持真正的运行时热重载、完全卸载与网络/文件系统权限控制。详见 [Wasm 插件系统](wasm_plugin.md)。
+
 ### 调试工具
 > `import "github.com/Jel1ySpot/GoroBot/example_plugin/tests"`
 

@@ -12,6 +12,7 @@
 - [中间件系统](middleware.md)
 - [命令系统](command.md)
 - [插件系统](plugin.md)
+- [Wasm 插件系统](wasm_plugin.md)
 
 # APIS
 
