@@ -5,6 +5,8 @@
 /build/plugins
 /build/conf
 /napcat-onebot
+/plugin
+/data
 
 # LLMs
 CLAUDE.md

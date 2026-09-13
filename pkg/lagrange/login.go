@@ -66,7 +66,7 @@ func (s *Service) login() error {
 				continue
 			}
 			if !retCode.Success() {
-				return fmt.Errorf(retCode.Name())
+				return fmt.Errorf("%s", retCode.Name())
 			}
 			break
 		}

@@ -78,7 +78,7 @@ func (i *Instant) LoadResourceFromID(id string) (string, error) {
 	}
 
 	if res.Error != "" {
-		return "", fmt.Errorf(res.Error)
+		return "", fmt.Errorf("%s", res.Error)
 	}
 
 	i.contextsMu.RLock()
