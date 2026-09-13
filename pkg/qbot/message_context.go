@@ -3,16 +3,14 @@ package qbot
 import (
 	"context"
 	"fmt"
-	"strings"
-	"unsafe"
-
 	urlpkg "net/url"
 	"path"
+	"strings"
+	"time"
 
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
-	"github.com/tencent-connect/botgo/dto"
 )
 
 const (
@@ -24,11 +22,11 @@ const (
 type MessageContext struct {
 	bot   *Service
 	base  *botc.BaseMessage
-	event *dto.WSPayload
-	data  *dto.Message
+	event *WSPayload
+	data  *Message
 }
 
-func NewMessageContext(bot *Service, event *dto.WSPayload, data *dto.Message) *MessageContext {
+func NewMessageContext(bot *Service, event *WSPayload, data *Message) *MessageContext {
 	return &MessageContext{
 		bot:   bot,
 		event: event,
@@ -56,7 +54,10 @@ func (m *MessageContext) Message() *botc.BaseMessage {
 }
 
 func (m *MessageContext) SenderID() string {
-	return m.data.Author.ID
+	if m.data.Author != nil {
+		return m.data.Author.ID
+	}
+	return ""
 }
 
 func (m *MessageContext) NewMessageBuilder() botc.MessageBuilder {
@@ -64,15 +65,18 @@ func (m *MessageContext) NewMessageBuilder() botc.MessageBuilder {
 }
 
 func (m *MessageContext) Reply(elements []*botc.MessageElement) (*botc.BaseMessage, error) {
-	return nil, nil
+	builder := NewMessageBuilder(m)
+	builder.ApplyElements(elements)
+	return builder.ReplyTo(m)
 }
 
-func (m *MessageContext) reply(body *dto.MessageToCreate) (*botc.BaseMessage, error) {
+func (m *MessageContext) reply(body *MessageToCreate) (*botc.BaseMessage, error) {
 	if m.event != nil {
-		body.EventID = m.event.EventID
+		body.EventID = m.event.ID
 	}
 	body.MsgID = m.data.ID
-	if m.data.DirectMessage {
+
+	if m.data.DirectMessage && m.data.Author != nil {
 		msg, err := m.bot.api.PostC2CMessage(context.Background(), m.data.Author.ID, body)
 		if err != nil {
 			return nil, err
@@ -100,11 +104,11 @@ func (m *MessageContext) ReplyText(a ...any) (*botc.BaseMessage, error) {
 	return m.NewMessageBuilder().Text(fmt.Sprint(a...)).ReplyTo(m)
 }
 
-// ParseMessage 将 dto.Message 转换为 BaseMessage
-func ParseMessage(grb *GoroBot.Instant, bot *Service, data *dto.Message) *botc.BaseMessage {
+// ParseMessage 将 Message 转换为 BaseMessage
+func ParseMessage(grb *GoroBot.Instant, bot *Service, data *Message) *botc.BaseMessage {
 	b := botc.NewBuilder()
 	if data.MessageReference != nil {
-		b.Quote(&botc.BaseMessage{ID: FormatID("msg", data.MessageReference.GetEventID(), data.MessageReference.MessageID)})
+		b.Quote(&botc.BaseMessage{ID: FormatID("msg", data.MessageReference.EventID, data.MessageReference.MessageID)})
 	}
 	if data.MentionEveryone {
 		b.Mention(FormatID("user", "everyone"))
@@ -141,18 +145,36 @@ func ParseMessage(grb *GoroBot.Instant, bot *Service, data *dto.Message) *botc.B
 		}
 	}
 
-	t, _ := data.Timestamp.Time()
+	msgType := botc.MessageType(0)
+	if data.DirectMessage {
+		msgType = DirectMessage
+	} else if data.GroupID != "" {
+		msgType = GroupMessage
+	} else {
+		msgType = GuildMessage
+	}
+
+	var msgTime time.Time
+	if data.Timestamp != "" {
+		if t, err := time.Parse(time.RFC3339, data.Timestamp); err == nil {
+			msgTime = t
+		}
+	}
+	if msgTime.IsZero() {
+		msgTime = time.Now()
+	}
+
 	return &botc.BaseMessage{
-		MessageType: botc.MessageType(1 - int(*(*byte)(unsafe.Pointer(&data.DirectMessage)))),
+		MessageType: msgType,
 		ID:          data.ID,
 		Content:     data.Content,
 		Elements:    b.Build(),
 		Sender:      parseSender(data),
-		Time:        t,
+		Time:        msgTime,
 	}
 }
 
-func parseSender(data *dto.Message) *entity.Sender {
+func parseSender(data *Message) *entity.Sender {
 	if data.Author == nil {
 		return nil
 	}

@@ -2,9 +2,9 @@ package qbot
 
 import (
 	"fmt"
-	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
-	"github.com/tencent-connect/botgo/dto"
 	"strings"
+
+	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
 )
 
 func ParseID(idInfo string) (string, bool) {
@@ -20,10 +20,14 @@ func FormatID(type_ string, v ...string) string {
 }
 
 func (s *Service) GenResourceURL(id string) string {
-	return fmt.Sprintf("%s/resource/%s", s.config.Http.BaseURL, id)
+	wb := s.config.GetWebhookConfig()
+	if wb.BaseURL != "" {
+		return fmt.Sprintf("%s/resource/%s", strings.TrimRight(wb.BaseURL, "/"), id)
+	}
+	return ""
 }
 
-func ParseUser(user *dto.User, member *dto.Member) *entity.Sender {
+func ParseUser(user *User, member *Member) *entity.Sender {
 	if user == nil {
 		return nil
 	}

@@ -10,7 +10,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"time"
 
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
@@ -18,9 +17,6 @@ import (
 	"github.com/Jel1ySpot/GoroBot/pkg/core/logger"
 	"github.com/Jel1ySpot/conic"
 	"github.com/google/uuid"
-	"github.com/tencent-connect/botgo"
-	"github.com/tencent-connect/botgo/openapi"
-	"github.com/tencent-connect/botgo/token"
 )
 
 type Service struct {
@@ -28,7 +24,11 @@ type Service struct {
 	configPath string
 	conic      *conic.Conic
 
-	api       openapi.OpenAPI
+	tokenManager *TokenManager
+	api          *Client
+	gateway      *GatewayConnection
+
+	ctx       context.Context
 	ctxCancel context.CancelFunc
 
 	grb    *GoroBot.Instant
@@ -51,32 +51,69 @@ func (s *Service) Name() string {
 func (s *Service) Init(grb *GoroBot.Instant) error {
 	s.grb = grb
 	s.logger = grb.GetLogger()
-	_, s.ctxCancel = context.WithCancel(context.Background())
+	s.ctx, s.ctxCancel = context.WithCancel(context.Background())
 
 	if err := s.initConfig(); err != nil {
 		return err
 	}
 
-	tokenSource := token.NewQQBotTokenSource(&s.config.Credentials)
-	if err := token.StartRefreshAccessToken(context.Background(), tokenSource); err != nil {
-		return err
+	if !s.config.IsConfigured() {
+		s.logInfo("QBot API 凭据未配置，启动手机 QQ 扫码接入流程...")
+		creds, err := s.QRConnect(s.ctx)
+		if err != nil {
+			return fmt.Errorf("qbot qr connect failed: %w", err)
+		}
+		s.config.Credentials.AppID = creds.AppID
+		s.config.Credentials.Secret = creds.Secret
+		if err := s.conic.WriteConfig(); err != nil {
+			s.logWarning("QBot 凭据写入配置文件失败: %v", err)
+		} else {
+			s.logSuccess("QBot 扫码接入成功！凭据已保存至配置文件，AppID: %s", creds.AppID)
+		}
 	}
-	s.api = botgo.NewOpenAPI(s.config.Credentials.AppID, tokenSource).WithTimeout(5 * time.Second).SetDebug(s.config.Debug)
 
-	s.registerHandlers()
+	s.tokenManager = NewTokenManager(DefaultTokenBaseURL, s.logger)
+	s.tokenManager.StartBackgroundRefresh(s.ctx, s.config.Credentials.AppID, s.config.Credentials.ClientSecret())
+	s.api = NewClient(DefaultAPIBaseURL, s.config.Credentials, s.tokenManager, s.logger, s.config.Debug)
 
-	if err := s.runHttp(); err != nil {
-		return err
+	mode := strings.ToLower(s.config.Mode)
+	switch mode {
+	case "webhook":
+		if err := s.runHttp(); err != nil {
+			return err
+		}
+	case "both":
+		if err := s.runHttp(); err != nil {
+			return err
+		}
+		s.gateway = NewGatewayConnection(s)
+		s.gateway.Start(s.ctx)
+	default: // "websocket" 或留空（默认）
+		s.gateway = NewGatewayConnection(s)
+		s.gateway.Start(s.ctx)
+		if wb := s.config.GetWebhookConfig(); wb.Port > 0 {
+			if err := s.runHttp(); err != nil {
+				s.logWarning("QBot run resource server error: %v", err)
+			}
+		}
 	}
 
+	s.status = botc.Online
 	grb.AddContext(s)
 
 	return nil
 }
 
 func (s *Service) Release(grb *GoroBot.Instant) error {
-	s.ctxCancel()
+	if s.ctxCancel != nil {
+		s.ctxCancel()
+	}
+	s.status = botc.Offline
 	return nil
+}
+
+func (s *Service) API() *Client {
+	return s.api
 }
 
 func (s *Service) ID() string {
@@ -85,6 +122,36 @@ func (s *Service) ID() string {
 		return fmt.Sprintf("%s:%s", s.Protocol(), s.config.Credentials.AppID)
 	}
 	return fmt.Sprintf("%s:%s", s.Protocol(), u.ID)
+}
+
+func (s *Service) logInfo(format string, args ...any) {
+	if s.logger != nil {
+		s.logger.Info(format, args...)
+	}
+}
+
+func (s *Service) logWarning(format string, args ...any) {
+	if s.logger != nil {
+		s.logger.Warning(format, args...)
+	}
+}
+
+func (s *Service) logError(format string, args ...any) {
+	if s.logger != nil {
+		s.logger.Error(format, args...)
+	}
+}
+
+func (s *Service) logSuccess(format string, args ...any) {
+	if s.logger != nil {
+		s.logger.Success(format, args...)
+	}
+}
+
+func (s *Service) logDebug(format string, args ...any) {
+	if s.logger != nil {
+		s.logger.Debug(format, args...)
+	}
 }
 
 func (s *Service) Protocol() string {
@@ -102,13 +169,15 @@ func (s *Service) NewMessageBuilder() botc.MessageBuilder {
 }
 
 func (s *Service) SendDirectMessage(target entity.User, elements []*botc.MessageElement) (*botc.BaseMessage, error) {
-	//TODO implement me
-	return nil, nil
+	builder := NewMessageBuilder(&MessageContext{bot: s})
+	builder.ApplyElements(elements)
+	return builder.Send(FormatID("user", target.ID))
 }
 
 func (s *Service) SendGroupMessage(target entity.Group, elements []*botc.MessageElement) (*botc.BaseMessage, error) {
-	//TODO implement me
-	return nil, nil
+	builder := NewMessageBuilder(&MessageContext{bot: s})
+	builder.ApplyElements(elements)
+	return builder.Send(FormatID("group", target.ID))
 }
 
 func (s *Service) Contacts() []entity.User {

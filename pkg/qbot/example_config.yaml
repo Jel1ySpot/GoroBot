@@ -1,12 +1,15 @@
 debug: false
+mode: "websocket" # 连接模式: "websocket" (默认), "webhook", 或 "both"
 api:
     appid: "your app id"
     secret: "your secret key"
-http:
-    host: "0.0.0.0"
-    path: "/bot"
-    port: 8443
-    base_url: "http://your.domain.net:8443"
-    tls:
-        cert_path: "/path/to/server.crt"
-        key_path: "/path/to/server.key"
+
+# 可选：仅在 mode 为 "webhook" 或需对外提供静态资源下载服务时需要配置
+# webhook:
+#     host: "0.0.0.0"
+#     path: "/bot"
+#     port: 8443
+#     base_url: "http://your.domain.net:8443"
+#     tls:
+#         cert_path: "/path/to/server.crt"
+#         key_path: "/path/to/server.key"

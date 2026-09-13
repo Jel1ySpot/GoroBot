@@ -12,11 +12,10 @@ import (
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
-	"github.com/tencent-connect/botgo/dto"
 )
 
 type MessageBuilder struct {
-	*dto.MessageToCreate
+	*MessageToCreate
 	fromMsg   *MessageContext
 	MediaData []byte
 	MediaType uint64
@@ -25,7 +24,7 @@ type MessageBuilder struct {
 
 func NewMessageBuilder(from *MessageContext) *MessageBuilder {
 	return &MessageBuilder{
-		MessageToCreate: &dto.MessageToCreate{},
+		MessageToCreate: &MessageToCreate{},
 		fromMsg:         from,
 		ctx:             from.bot,
 	}
@@ -48,8 +47,14 @@ func (m *MessageBuilder) Quote(msg *botc.BaseMessage) botc.MessageBuilder {
 	if !ok || info.Protocol != m.Protocol() || info.Args[0] != "msg" {
 		return m
 	}
-	m.MessageReference = &dto.MessageReference{
-		MessageID:             info.Args[2],
+	msgID := ""
+	if len(info.Args) >= 3 {
+		msgID = info.Args[2]
+	} else if len(info.Args) >= 2 {
+		msgID = info.Args[1]
+	}
+	m.MessageReference = &MessageReference{
+		MessageID:             msgID,
 		IgnoreGetMessageError: true,
 	}
 	return m
@@ -74,7 +79,6 @@ func (m *MessageBuilder) CmdInput(text, show string, reference bool) *MessageBui
 	if show != "" {
 		show = fmt.Sprintf("show=\"%s\" ", urlpkg.QueryEscape(show))
 	}
-
 	m.Text(fmt.Sprintf("<qqbot-cmd-input text=\"%s\" %sreference=\"%t\" /> ", urlpkg.QueryEscape(text), show, reference))
 	return m
 }
@@ -168,11 +172,40 @@ func (m *MessageBuilder) VoiceFromData(data []byte) *MessageBuilder {
 	return m
 }
 
-func (m *MessageBuilder) Build() *dto.MessageToCreate {
+// ApplyElements 将 MessageElement 列表应用到构建器
+func (m *MessageBuilder) ApplyElements(elements []*botc.MessageElement) *MessageBuilder {
+	for _, el := range elements {
+		switch el.Type {
+		case botc.TextElement:
+			m.Text(el.Content)
+		case botc.ImageElement:
+			if pathStr, err := m.ctx.grb.LoadResourceFromID(el.Source); err == nil {
+				m.ImageFromFile(pathStr)
+			}
+		case botc.VoiceElement:
+			if pathStr, err := m.ctx.grb.LoadResourceFromID(el.Source); err == nil {
+				if data, err := os.ReadFile(pathStr); err == nil {
+					m.VoiceFromData(data)
+				}
+			}
+		case botc.VideoElement:
+			if pathStr, err := m.ctx.grb.LoadResourceFromID(el.Source); err == nil {
+				if data, err := os.ReadFile(pathStr); err == nil {
+					m.VideoFromData(data)
+				}
+			}
+		case botc.MentionElement:
+			m.Mention(el.Source)
+		}
+	}
+	return m
+}
+
+func (m *MessageBuilder) Build() *MessageToCreate {
 	m.MsgSeq = 1
 	m.Timestamp = time.Now().Unix()
 	if m.MessageToCreate.Media != nil {
-		m.MsgType = dto.RichMediaMsg
+		m.MsgType = 7
 	}
 	return m.MessageToCreate
 }
@@ -205,10 +238,10 @@ func (m *MessageBuilder) prePostMedia(id string) error {
 		return nil
 	}
 	if data, err := m.ctx.UploadFileData(id, m.MediaType, m.MediaData); err == nil {
-		info := dto.MediaInfo{
+		m.MessageToCreate.Media = &MediaInfo{
 			FileInfo: data.FileInfo,
 		}
-		m.MessageToCreate.Media = &info
+		m.MessageToCreate.MsgType = 7
 	} else {
 		return err
 	}
@@ -221,26 +254,26 @@ func (m *MessageBuilder) Send(id string) (*botc.BaseMessage, error) {
 	}
 
 	info, ok := entity.ParseInfo(id)
-	if !ok || info.Protocol != "lagrange" {
+	if !ok || info.Protocol != m.Protocol() {
 		return nil, fmt.Errorf("invalid id %s", id)
 	}
-	idType, id := info.Args[0], info.Args[1]
+	idType, idVal := info.Args[0], info.Args[1]
 
 	switch idType {
 	case "user":
-		data, err := m.ctx.api.PostC2CMessage(context.Background(), id, m.Build())
+		data, err := m.ctx.api.PostC2CMessage(context.Background(), idVal, m.Build())
 		if err != nil {
 			return nil, err
 		}
 		return ParseMessage(m.ctx.grb, m.ctx, data), nil
 	case "group":
-		data, err := m.ctx.api.PostGroupMessage(context.Background(), id, m.Build())
+		data, err := m.ctx.api.PostGroupMessage(context.Background(), idVal, m.Build())
 		if err != nil {
 			return nil, err
 		}
 		return ParseMessage(m.ctx.grb, m.ctx, data), nil
 	case "channel":
-		data, err := m.ctx.api.PostMessage(context.Background(), id, m.Build())
+		data, err := m.ctx.api.PostMessage(context.Background(), idVal, m.Build())
 		if err != nil {
 			return nil, err
 		}
