@@ -24,7 +24,7 @@ func ListPlugins(pluginPath string) ([]string, error) {
 		}
 		// 检查是否是 .so 文件
 		if !info.IsDir() && strings.HasSuffix(info.Name(), ".so") {
-			soFiles = append(soFiles, strings.TrimRight(path, ".so"))
+			soFiles = append(soFiles, strings.TrimSuffix(path, ".so"))
 		}
 		return nil
 	})

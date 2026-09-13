@@ -13,6 +13,9 @@ func (s *Service) LookupPlugins() (int, error) {
 		return 0, err
 	}
 
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	for _, name := range plugins {
 		if _, ok := s.pluginStat[name]; !ok {
 			s.pluginStat[name] = false
@@ -27,8 +30,19 @@ func (s *Service) InitPlugins() {
 
 	log.Info("Start initializing Go plugins")
 
-	for name, stat := range s.pluginStat {
-		if stat == true {
+	s.mu.RLock()
+	pluginsToInit := make([]string, 0, len(s.pluginStat))
+	for name := range s.pluginStat {
+		pluginsToInit = append(pluginsToInit, name)
+	}
+	s.mu.RUnlock()
+
+	for _, name := range pluginsToInit {
+		s.mu.RLock()
+		stat := s.pluginStat[name]
+		s.mu.RUnlock()
+
+		if stat {
 			if err := s.ReleasePlugin(name); err != nil {
 				log.Failed("Failed to re-initialize plugin: %s", name)
 				continue
@@ -40,9 +54,16 @@ func (s *Service) InitPlugins() {
 	}
 }
 
-func (s *Service) InitPlugin(name string) error {
+func (s *Service) InitPlugin(name string) (err error) {
 	log := s.logger
 	grb := s.grb
+
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("plugin %s panicked during initialization: %v", name, r)
+			log.Failed(err.Error())
+		}
+	}()
 
 	p, err := plugin.Open(name + ".so")
 	if err != nil {
@@ -65,33 +86,58 @@ func (s *Service) InitPlugin(name string) error {
 		return fmt.Errorf("failed to initialize plugin service %s: %v", service.Name(), err)
 	}
 
+	s.mu.Lock()
 	s.services[name] = service
 	s.pluginStat[name] = true
+	s.mu.Unlock()
+
 	log.Success("Initialized plugin service %s success", service.Name())
 
 	return nil
 }
 
-func (s *Service) ReleasePlugin(name string) error {
-	if _, ok := s.pluginStat[name]; !ok {
+func (s *Service) ReleasePlugin(name string) (err error) {
+	s.mu.RLock()
+	_, ok := s.pluginStat[name]
+	service := s.services[name]
+	s.mu.RUnlock()
+
+	if !ok {
 		return fmt.Errorf("plugin %s not found", name)
 	}
-	s.logger.Debug("Releasing plugin service %s", name)
-	if err := s.services[name].Release(s.grb); err != nil {
-		return fmt.Errorf("failed to release plugin service %s: %v", name, err)
+
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("plugin %s panicked during release: %v", name, r)
+			s.logger.Failed(err.Error())
+		}
+	}()
+
+	if service != nil {
+		s.logger.Debug("Releasing plugin service %s", name)
+		if err := service.Release(s.grb); err != nil {
+			return fmt.Errorf("failed to release plugin service %s: %v", name, err)
+		}
 	}
+
+	s.mu.Lock()
 	delete(s.services, name)
 	s.pluginStat[name] = false
+	s.mu.Unlock()
+
 	s.logger.Success("Released plugin service %s success", name)
 	return nil
 }
 
 func (s *Service) EnablePlugin(name string) error {
-	if _, ok := s.pluginStat[name]; !ok {
+	s.mu.RLock()
+	stat, ok := s.pluginStat[name]
+	s.mu.RUnlock()
+
+	if !ok {
 		return fmt.Errorf("plugin %s not found", name)
 	}
 
-	stat := s.pluginStat[name]
 	if stat {
 		return fmt.Errorf("plugin %s is already enabled", name)
 	}
@@ -102,14 +148,36 @@ func (s *Service) EnablePlugin(name string) error {
 }
 
 func (s *Service) DisablePlugin(name string) error {
-	if stat, ok := s.pluginStat[name]; ok {
-		if !stat {
-			return fmt.Errorf("plugin %s is already disabled", name)
-		}
-		if err := s.ReleasePlugin(name); err != nil {
-			return err
-		}
-		return nil
+	s.mu.RLock()
+	stat, ok := s.pluginStat[name]
+	s.mu.RUnlock()
+
+	if !ok {
+		return fmt.Errorf("plugin %s not found", name)
 	}
-	return fmt.Errorf("plugin %s not found", name)
+	if !stat {
+		return fmt.Errorf("plugin %s is already disabled", name)
+	}
+	if err := s.ReleasePlugin(name); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Service) GetPluginStat() map[string]bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	statCopy := make(map[string]bool, len(s.pluginStat))
+	for k, v := range s.pluginStat {
+		statCopy[k] = v
+	}
+	return statCopy
+}
+
+func (s *Service) HasPlugin(name string) (bool, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	stat, ok := s.pluginStat[name]
+	return stat, ok
 }

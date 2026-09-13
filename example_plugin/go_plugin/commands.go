@@ -13,6 +13,11 @@ var (
 	pluginsListTemplate *template.Template
 )
 
+func (s *Service) isOwner(ctx *command.Context) bool {
+	id, ok := s.grb.GetOwner(ctx.BotContext().ID())
+	return ok && id == ctx.SenderID()
+}
+
 func (s *Service) initCmd() {
 	grb := s.grb
 
@@ -20,9 +25,9 @@ func (s *Service) initCmd() {
 
 	_, _ = cmd.SubCommand("lookup").
 		Action(func(ctx *command.Context) error {
-			if id, ok := grb.GetOwner(ctx.BotContext().ID()); ok && id != ctx.SenderID() {
+			if !s.isOwner(ctx) {
 				_, _ = ctx.ReplyText("Permission denied.")
-				return nil
+				return fmt.Errorf("permission denied")
 			}
 			n, err := s.LookupPlugins()
 			if err != nil {
@@ -36,19 +41,21 @@ func (s *Service) initCmd() {
 	_, _ = cmd.SubCommand("load").
 		Argument("name", command.String, true, "需要加载的插件").
 		Action(func(ctx *command.Context) error {
-			if id, ok := grb.GetOwner(ctx.BotContext().ID()); ok && id != ctx.SenderID() {
+			if !s.isOwner(ctx) {
+				_, _ = ctx.ReplyText("Permission denied.")
 				return fmt.Errorf("permission denied")
 			}
 			name := ctx.KvArgs["name"]
 			if strings.ToLower(name) == "all" {
-				for name, stat := range s.pluginStat {
+				stats := s.GetPluginStat()
+				for pName, stat := range stats {
 					if stat {
-						if err := s.ReleasePlugin(name); err != nil {
-							_, _ = ctx.ReplyText("plugin ", name, " release failed with error: ", err.Error())
+						if err := s.ReleasePlugin(pName); err != nil {
+							_, _ = ctx.ReplyText("plugin ", pName, " release failed with error: ", err.Error())
 						}
 					}
-					if err := s.InitPlugin(name); err != nil {
-						_, _ = ctx.ReplyText("plugin ", name, " initialization failed with error: ", err.Error())
+					if err := s.InitPlugin(pName); err != nil {
+						_, _ = ctx.ReplyText("plugin ", pName, " initialization failed with error: ", err.Error())
 					}
 				}
 
@@ -56,11 +63,12 @@ func (s *Service) initCmd() {
 				return nil
 			}
 
-			if _, ok := s.pluginStat[name]; !ok {
+			stat, ok := s.HasPlugin(name)
+			if !ok {
 				return fmt.Errorf("plugin not found: %s", name)
 			}
 
-			if s.pluginStat[name] {
+			if stat {
 				if err := s.ReleasePlugin(name); err != nil {
 					return err
 				}
@@ -77,7 +85,8 @@ func (s *Service) initCmd() {
 	_, _ = cmd.SubCommand("enable").
 		Argument("name", command.String, true, "需要启用的插件").
 		Action(func(ctx *command.Context) error {
-			if id, ok := grb.GetOwner(ctx.BotContext().ID()); ok && id != ctx.SenderID() {
+			if !s.isOwner(ctx) {
+				_, _ = ctx.ReplyText("Permission denied.")
 				return fmt.Errorf("permission denied")
 			}
 			name := ctx.KvArgs["name"]
@@ -97,14 +106,16 @@ func (s *Service) initCmd() {
 	_, _ = cmd.SubCommand("disable").
 		Argument("name", command.String, true, "需要禁用的插件").
 		Action(func(ctx *command.Context) error {
-			if id, ok := grb.GetOwner(ctx.BotContext().ID()); ok && id != ctx.SenderID() {
+			if !s.isOwner(ctx) {
+				_, _ = ctx.ReplyText("Permission denied.")
 				return fmt.Errorf("permission denied")
 			}
 			name := ctx.KvArgs["name"]
 			if strings.ToLower(name) == "all" {
-				for name, stat := range s.pluginStat {
-					if stat == true {
-						if err := s.DisablePlugin(name); err != nil {
+				stats := s.GetPluginStat()
+				for pName, stat := range stats {
+					if stat {
+						if err := s.DisablePlugin(pName); err != nil {
 							_, _ = ctx.ReplyText(err)
 						}
 					}
@@ -121,10 +132,14 @@ func (s *Service) initCmd() {
 
 	_, _ = cmd.SubCommand("list").
 		Action(func(ctx *command.Context) error {
+			if !s.isOwner(ctx) {
+				_, _ = ctx.ReplyText("Permission denied.")
+				return fmt.Errorf("permission denied")
+			}
 			var buf bytes.Buffer
 
 			if err := pluginsListTemplate.Execute(&buf, map[string]any{
-				"Plugins": s.pluginStat,
+				"Plugins": s.GetPluginStat(),
 			}); err != nil {
 				return err
 			}

@@ -3,6 +3,7 @@ package go_plugin
 import (
 	"fmt"
 	"runtime"
+	"sync"
 
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/logger"
@@ -22,6 +23,7 @@ type Service struct {
 	logger logger.Inst
 
 	PluginPath string
+	mu         sync.RWMutex
 	pluginStat map[string]bool
 	services   map[string]GoroBot.Service
 }
@@ -67,11 +69,18 @@ func (s *Service) Init(grb *GoroBot.Instant) error {
 }
 
 func (s *Service) Release(grb *GoroBot.Instant) error {
+	s.mu.RLock()
+	var enabledPlugins []string
 	for name, stat := range s.pluginStat {
 		if stat {
-			if err := s.ReleasePlugin(name); err != nil {
-				s.logger.Failed(err.Error())
-			}
+			enabledPlugins = append(enabledPlugins, name)
+		}
+	}
+	s.mu.RUnlock()
+
+	for _, name := range enabledPlugins {
+		if err := s.ReleasePlugin(name); err != nil {
+			s.logger.Failed(err.Error())
 		}
 	}
 	return nil
