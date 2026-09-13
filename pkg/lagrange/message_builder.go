@@ -145,6 +145,11 @@ func (b *MessageBuilder) Image(path string, data []byte, isSticker bool, summary
 	return b
 }
 
+func (b *MessageBuilder) InlineKeyboard(kb *botc.InlineKeyboard) botc.MessageBuilder {
+	// Lagrange 协议不支持内嵌键盘，静默忽略以保证链式调用兼容
+	return b
+}
+
 func (b *MessageBuilder) Mention(id string) botc.MessageBuilder {
 	if b.err != nil {
 		return b

@@ -23,6 +23,20 @@ func (m *MessageContext) Protocol() string {
 	return "lagrange"
 }
 
+func (m *MessageContext) Features() []botc.Feature {
+	if m.service != nil {
+		return (&Context{m.service}).Features()
+	}
+	return nil
+}
+
+func (m *MessageContext) SupportsFeature(feature botc.Feature) bool {
+	if m.service != nil {
+		return (&Context{m.service}).SupportsFeature(feature)
+	}
+	return false
+}
+
 func NewMessageContext(msg any, service *Service) *MessageContext {
 	switch msg := msg.(type) {
 	case *LgrMessage.PrivateMessage:

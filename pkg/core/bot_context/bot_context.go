@@ -5,6 +5,7 @@ import (
 )
 
 type BotContext interface {
+	FeatureProvider
 	ID() string
 	Name() string
 	Protocol() string

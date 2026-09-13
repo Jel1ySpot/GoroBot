@@ -107,6 +107,22 @@ func (m *MessageBuilder) ImageFromData(data []byte) botc.MessageBuilder {
 	return m
 }
 
+func (m *MessageBuilder) InlineKeyboard(kb *botc.InlineKeyboard) botc.MessageBuilder {
+	if m.err != nil || kb == nil {
+		return m
+	}
+	data, err := kb.ToJSON()
+	if err != nil {
+		m.err = fmt.Errorf("serialize inline keyboard: %w", err)
+		return m
+	}
+	m.elements = append(m.elements, &botc.MessageElement{
+		Type:    botc.InlineKeyboardElement,
+		Content: data,
+	})
+	return m
+}
+
 func (m *MessageBuilder) ReplyTo(msgCtx botc.MessageContext) (*botc.BaseMessage, error) {
 	if m.err != nil {
 		return nil, m.err
@@ -154,23 +170,32 @@ func (m *MessageBuilder) Send(id string) (*botc.BaseMessage, error) {
 func (s *Service) sendToChat(chatID int64, elements []*botc.MessageElement) (*botc.BaseMessage, error) {
 	text := extractText(elements)
 	photoSource := firstImageSource(s, elements)
+	markup := extractReplyMarkup(elements)
 
 	ctx := context.Background()
 
 	if photoSource != "" {
-		return s.sendPhoto(ctx, chatID, photoSource, text)
+		return s.sendPhotoWithMarkup(ctx, chatID, photoSource, text, markup)
 	}
-	return s.sendText(ctx, chatID, text)
+	return s.sendTextWithMarkup(ctx, chatID, text, markup)
 }
 
 func (s *Service) sendText(ctx context.Context, chatID int64, text string) (*botc.BaseMessage, error) {
+	return s.sendTextWithMarkup(ctx, chatID, text, nil)
+}
+
+func (s *Service) sendTextWithMarkup(ctx context.Context, chatID int64, text string, markup models.ReplyMarkup) (*botc.BaseMessage, error) {
 	if text == "" {
 		text = "(空消息)"
 	}
-	msg, err := s.bot.SendMessage(ctx, &bot.SendMessageParams{
+	params := &bot.SendMessageParams{
 		ChatID: chatID,
 		Text:   text,
-	})
+	}
+	if markup != nil {
+		params.ReplyMarkup = markup
+	}
+	msg, err := s.bot.SendMessage(ctx, params)
 	if err != nil {
 		return nil, err
 	}
@@ -178,6 +203,10 @@ func (s *Service) sendText(ctx context.Context, chatID int64, text string) (*bot
 }
 
 func (s *Service) sendPhoto(ctx context.Context, chatID int64, source string, caption string) (*botc.BaseMessage, error) {
+	return s.sendPhotoWithMarkup(ctx, chatID, source, caption, nil)
+}
+
+func (s *Service) sendPhotoWithMarkup(ctx context.Context, chatID int64, source string, caption string, markup models.ReplyMarkup) (*botc.BaseMessage, error) {
 	var photo models.InputFile
 
 	if data, err := os.ReadFile(source); err == nil {
@@ -189,11 +218,15 @@ func (s *Service) sendPhoto(ctx context.Context, chatID int64, source string, ca
 		photo = &models.InputFileString{Data: source}
 	}
 
-	msg, err := s.bot.SendPhoto(ctx, &bot.SendPhotoParams{
+	params := &bot.SendPhotoParams{
 		ChatID:  chatID,
 		Photo:   photo,
 		Caption: caption,
-	})
+	}
+	if markup != nil {
+		params.ReplyMarkup = markup
+	}
+	msg, err := s.bot.SendPhoto(ctx, params)
 	if err != nil {
 		return nil, err
 	}
@@ -228,4 +261,42 @@ func extractText(elements []*botc.MessageElement) string {
 		}
 	}
 	return builder.String()
+}
+
+func extractReplyMarkup(elements []*botc.MessageElement) models.ReplyMarkup {
+	for _, elem := range elements {
+		if elem.Type != botc.InlineKeyboardElement || elem.Content == "" {
+			continue
+		}
+		kb, err := botc.ParseInlineKeyboard(elem.Content)
+		if err != nil || kb == nil || len(kb.Rows) == 0 {
+			continue
+		}
+
+		var inlineRows [][]models.InlineKeyboardButton
+		for _, row := range kb.Rows {
+			var inlineRow []models.InlineKeyboardButton
+			for _, btn := range row {
+				tgBtn := models.InlineKeyboardButton{
+					Text: btn.Text,
+				}
+				switch btn.Action {
+				case botc.ActionURL:
+					tgBtn.URL = btn.Data
+				case botc.ActionCallback:
+					tgBtn.CallbackData = btn.Data
+				case botc.ActionCommand:
+					// Telegram 内嵌键盘通过 SwitchInlineQueryCurrentChat 实现指令代填或回传
+					data := btn.Data
+					tgBtn.SwitchInlineQueryCurrentChat = &data
+				}
+				inlineRow = append(inlineRow, tgBtn)
+			}
+			inlineRows = append(inlineRows, inlineRow)
+		}
+		return &models.InlineKeyboardMarkup{
+			InlineKeyboard: inlineRows,
+		}
+	}
+	return nil
 }

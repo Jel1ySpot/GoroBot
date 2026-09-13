@@ -18,6 +18,7 @@ const (
 	VoiceElement
 	StickerElement
 	LinkElement
+	InlineKeyboardElement
 	OtherElement
 )
 

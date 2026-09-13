@@ -162,6 +162,26 @@ func (s *Service) Status() botc.LoginStatus {
 	return s.status
 }
 
+func (s *Service) Features() []botc.Feature {
+	return []botc.Feature{
+		botc.FeatureText,
+		botc.FeatureImage,
+		botc.FeatureMarkdown,
+		botc.FeatureVoice,
+		botc.FeatureFile,
+		botc.FeatureInlineKeyboard,
+	}
+}
+
+func (s *Service) SupportsFeature(feature botc.Feature) bool {
+	for _, f := range s.Features() {
+		if f == feature {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Service) NewMessageBuilder() botc.MessageBuilder {
 	return NewMessageBuilder(&MessageContext{
 		bot: s,

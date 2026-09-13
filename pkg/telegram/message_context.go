@@ -29,6 +29,20 @@ func (m *MessageContext) BotContext() botc.BotContext {
 	return m.service
 }
 
+func (m *MessageContext) Features() []botc.Feature {
+	if m.service != nil {
+		return m.service.Features()
+	}
+	return nil
+}
+
+func (m *MessageContext) SupportsFeature(feature botc.Feature) bool {
+	if m.service != nil {
+		return m.service.SupportsFeature(feature)
+	}
+	return false
+}
+
 func (m *MessageContext) String() string {
 	return m.Message().Content
 }

@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 )
 
 func TestEd25519SignatureAndValidation(t *testing.T) {
@@ -328,5 +330,51 @@ func TestIsConfigured(t *testing.T) {
 	}
 	if !cfg3.IsConfigured() {
 		t.Errorf("valid credentials should be configured")
+	}
+}
+
+func TestFeaturesAndKeyboard(t *testing.T) {
+	service := Create()
+	if !service.SupportsFeature(botc.FeatureInlineKeyboard) {
+		t.Errorf("expected qbot to support FeatureInlineKeyboard")
+	}
+	if !service.SupportsFeature(botc.FeatureMarkdown) {
+		t.Errorf("expected qbot to support FeatureMarkdown")
+	}
+
+	msgCtx := NewMessageContext(service, nil, &Message{
+		ID:      "test_msg_id",
+		Content: "hello",
+		Author: &User{
+			ID:       "user_1",
+			Username: "Tester",
+		},
+	})
+	if !msgCtx.SupportsFeature(botc.FeatureInlineKeyboard) {
+		t.Errorf("expected msgCtx to support FeatureInlineKeyboard")
+	}
+
+	kb := botc.NewInlineKeyboard().AddRow(
+		botc.NewURLButton("官网", "https://bot.q.qq.com"),
+		botc.NewCommandButton("签到", "/sign", true),
+	)
+
+	builder := NewMessageBuilder(msgCtx)
+	builder.InlineKeyboard(kb)
+	msg := builder.Build()
+
+	if msg.Keyboard == nil || msg.Keyboard.Content == nil {
+		t.Fatalf("expected keyboard content to be populated")
+	}
+	if len(msg.Keyboard.Content.Rows) != 1 || len(msg.Keyboard.Content.Rows[0].Buttons) != 2 {
+		t.Fatalf("unexpected keyboard rows: %+v", msg.Keyboard.Content.Rows)
+	}
+	btn1 := msg.Keyboard.Content.Rows[0].Buttons[0]
+	btn2 := msg.Keyboard.Content.Rows[0].Buttons[1]
+	if btn1.Action.Type != 0 || btn1.Action.Data != "https://bot.q.qq.com" {
+		t.Errorf("unexpected btn1 action: %+v", btn1.Action)
+	}
+	if btn2.Action.Type != 2 || btn2.Action.Data != "/sign" || !btn2.Action.Enter {
+		t.Errorf("unexpected btn2 action: %+v", btn2.Action)
 	}
 }

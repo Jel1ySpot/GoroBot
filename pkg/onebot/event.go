@@ -100,6 +100,20 @@ func (mc *MessageContext) Protocol() string {
 	return "onebot"
 }
 
+func (mc *MessageContext) Features() []botc.Feature {
+	if mc.service != nil {
+		return mc.service.getContext().Features()
+	}
+	return nil
+}
+
+func (mc *MessageContext) SupportsFeature(feature botc.Feature) bool {
+	if mc.service != nil {
+		return mc.service.getContext().SupportsFeature(feature)
+	}
+	return false
+}
+
 func (mc *MessageContext) BotContext() botc.BotContext {
 	return mc.service.getContext()
 }

@@ -116,6 +116,66 @@ func (m *MessageBuilder) ImageFromData(data []byte) botc.MessageBuilder {
 	return m
 }
 
+// InlineKeyboard 设置内嵌按钮组件
+func (m *MessageBuilder) InlineKeyboard(kb *botc.InlineKeyboard) botc.MessageBuilder {
+	if kb == nil || len(kb.Rows) == 0 {
+		return m
+	}
+	var qRows []KeyboardRow
+	btnSeq := 1
+	for _, row := range kb.Rows {
+		var qButtons []KeyboardButton
+		for _, btn := range row {
+			btnID := btn.ID
+			if btnID == "" {
+				btnID = fmt.Sprintf("btn_%d", btnSeq)
+				btnSeq++
+			}
+			actionType := 0
+			switch btn.Action {
+			case botc.ActionURL:
+				actionType = 0
+			case botc.ActionCallback:
+				actionType = 1
+			case botc.ActionCommand:
+				actionType = 2
+			}
+			qButtons = append(qButtons, KeyboardButton{
+				ID: btnID,
+				RenderData: &KeyboardRenderData{
+					Label: btn.Text,
+					Style: 0,
+				},
+				Action: &KeyboardAction{
+					Type:  actionType,
+					Data:  btn.Data,
+					Enter: btn.DirectSend,
+					Reply: !btn.DirectSend,
+					Permission: &KeyboardPermission{
+						Type: 0, // 所有人可点击
+					},
+				},
+			})
+		}
+		qRows = append(qRows, KeyboardRow{Buttons: qButtons})
+	}
+
+	m.MessageToCreate.Keyboard = &Keyboard{
+		Content: &CustomKeyboard{
+			Rows: qRows,
+		},
+	}
+	return m
+}
+
+// KeyboardTemplate 通过模板 ID 设置内嵌按钮
+func (m *MessageBuilder) KeyboardTemplate(templateID string) *MessageBuilder {
+	m.MessageToCreate.Keyboard = &Keyboard{
+		ID: templateID,
+	}
+	return m
+}
+
 func (m *MessageBuilder) VideoFromFile(path string) *MessageBuilder {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -196,6 +256,10 @@ func (m *MessageBuilder) ApplyElements(elements []*botc.MessageElement) *Message
 			}
 		case botc.MentionElement:
 			m.Mention(el.Source)
+		case botc.InlineKeyboardElement:
+			if kb, err := botc.ParseInlineKeyboard(el.Content); err == nil {
+				m.InlineKeyboard(kb)
+			}
 		}
 	}
 	return m

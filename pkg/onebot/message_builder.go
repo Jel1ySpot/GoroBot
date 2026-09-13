@@ -95,6 +95,11 @@ func (mb *MessageBuilder) ImageFromData(data []byte) botc.MessageBuilder {
 	return mb
 }
 
+func (mb *MessageBuilder) InlineKeyboard(kb *botc.InlineKeyboard) botc.MessageBuilder {
+	// OneBot 协议不支持原生内嵌键盘，静默忽略以保证链式调用兼容
+	return mb
+}
+
 func (mb *MessageBuilder) ReplyTo(ctx botc.MessageContext) (*botc.BaseMessage, error) {
 	if mb.err != nil {
 		return nil, mb.err

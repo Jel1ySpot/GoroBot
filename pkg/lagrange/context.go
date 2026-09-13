@@ -24,6 +24,24 @@ func (ctx *Context) Protocol() string {
 	return "lagrange"
 }
 
+func (ctx *Context) Features() []botc.Feature {
+	return []botc.Feature{
+		botc.FeatureText,
+		botc.FeatureImage,
+		botc.FeatureVoice,
+		botc.FeatureFile,
+	}
+}
+
+func (ctx *Context) SupportsFeature(feature botc.Feature) bool {
+	for _, f := range ctx.Features() {
+		if f == feature {
+			return true
+		}
+	}
+	return false
+}
+
 func (ctx *Context) DownloadResourceFromRefLink(refLink string) (string, error) {
 	return ctx.service.DownloadResourceFromRefLink(refLink)
 }

@@ -8,6 +8,7 @@ type MessageBuilder interface {
 	ImageFromFile(path string) MessageBuilder
 	ImageFromUrl(url string) MessageBuilder
 	ImageFromData(data []byte) MessageBuilder
+	InlineKeyboard(kb *InlineKeyboard) MessageBuilder
 	ReplyTo(msg MessageContext) (*BaseMessage, error)
 	Send(id string) (*BaseMessage, error)
 }

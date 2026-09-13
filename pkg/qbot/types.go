@@ -99,7 +99,49 @@ type Markdown struct {
 // Keyboard 按钮组件
 type Keyboard struct {
 	ID      string          `json:"id,omitempty"`
-	Content json.RawMessage `json:"content,omitempty"`
+	Content *CustomKeyboard `json:"content,omitempty"`
+}
+
+// CustomKeyboard 自定义内嵌键盘内容
+type CustomKeyboard struct {
+	Rows []KeyboardRow `json:"rows"`
+}
+
+// KeyboardRow 按钮行
+type KeyboardRow struct {
+	Buttons []KeyboardButton `json:"buttons"`
+}
+
+// KeyboardButton 单个按钮
+type KeyboardButton struct {
+	ID         string              `json:"id,omitempty"`
+	RenderData *KeyboardRenderData `json:"render_data,omitempty"`
+	Action     *KeyboardAction     `json:"action,omitempty"`
+}
+
+// KeyboardRenderData 按钮渲染属性
+type KeyboardRenderData struct {
+	Label        string `json:"label"`
+	VisitedLabel string `json:"visited_label,omitempty"`
+	Style        int    `json:"style"` // 0=灰色线框, 1=蓝色线框, 2=推荐回复, 3=红色字体, 4=蓝色背景
+}
+
+// KeyboardAction 按钮交互动作
+type KeyboardAction struct {
+	Type          int                 `json:"type"` // 0=跳转链接, 1=回调(INTERACTION_CREATE), 2=指令输入(文本发给机器人), 3=mqqapi
+	Data          string              `json:"data,omitempty"`
+	Enter         bool                `json:"enter,omitempty"` // 点击后是否直接发送
+	Reply         bool                `json:"reply,omitempty"` // 指令是否发到输入框
+	Permission    *KeyboardPermission `json:"permission,omitempty"`
+	ClickLimit    int                 `json:"click_limit,omitempty"`
+	UnsupportTips string              `json:"unsupport_tips,omitempty"`
+}
+
+// KeyboardPermission 按钮权限
+type KeyboardPermission struct {
+	Type           int      `json:"type"` // 0=所有人, 1=管理员, 2=指定用户, 3=指定身份组
+	SpecifyRoleIDs []string `json:"specify_role_ids,omitempty"`
+	SpecifyUserIDs []string `json:"specify_user_ids,omitempty"`
 }
 
 // MediaInfo 富媒体消息标识

@@ -1,6 +1,7 @@
 package bot_context
 
 type MessageContext interface {
+	FeatureProvider
 	Protocol() string
 	BotContext() BotContext
 	String() string
