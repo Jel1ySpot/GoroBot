@@ -1,5 +1,5 @@
 # GoroBot
-Go语言编写的跨平台聊天机器人框架
+Go 语言编写的跨平台聊天机器人框架，用于 AI Agent 应用开发。
 
 ## [快速入门](https://jel1yspot.github.io/GoroBot/getting_started.html)
 
@@ -26,9 +26,6 @@ Go语言编写的跨平台聊天机器人框架
 ## TODO
 欢迎向本项目提交 Issue
 
-### Roadmap
-- [x] 完善指令系统
-
 ### Official Plugins
 - [x] `ping`: bot 还在线吗？ping 一下看看
 - [x] `message_logger`: 在控制台输出消息日志
@@ -36,4 +33,3 @@ Go语言编写的跨平台聊天机器人框架
 
 ### Bugs
 - [ ] Onebot 适配器未稳定（http连接未完善）
-
