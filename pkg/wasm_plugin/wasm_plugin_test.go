@@ -97,8 +97,8 @@ func TestHttpListenRoute(t *testing.T) {
 		t.Fatalf("注册路由失败: %v", err)
 	}
 
-	// 稍等服务启动
-	time.Sleep(100 * time.Millisecond)
+	// 等待服务启动
+	time.Sleep(300 * time.Millisecond)
 
 	// 请求不存在的路径 -> 404
 	resp404, err := http.Get("http://" + addr + "/not-found")

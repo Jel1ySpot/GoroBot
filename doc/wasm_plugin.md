@@ -89,22 +89,88 @@ Wasm 插件可以通过导入函数与 GoroBot 宿主进行双向交互。接口
     "handler": "on_command" // 触发时回调的 Wasm 导出函数名，默认 "on_command"
   }
   ```
-- **回调上下文**：指令触发时，宿主将包含用户输入与环境信息的 `CommandEvent` JSON 传给插件。若插件的导出函数直接返回非空文本，宿主会自动将其作为回复发送给用户。
-
-### 3. 消息回复与主动发送
-- **回复消息**：`gorobot_reply_text(context_token, text)`
-  - 在指令或事件处理上下文中使用收到的 `context_token` 进行即时回复。
-- **主动发消息**：`gorobot_send_message(req_json)`
-  - 主动向指定用户或群聊发送消息。
+- **回调上下文**：指令触发时，宿主将包含用户输入、群聊/私聊类型与环境信息的 `CommandEvent` JSON 传给插件。若插件的导出函数直接返回非空文本，宿主会自动将其作为回复发送给用户。
   ```json
   {
-    "context_id": "qq",      // 机器人上下文 ID，留空默认首个可用适配器
-    "target_id": "12345678", // 接收者 User ID 或 Group ID
-    "text": "你好，这是来自 Wasm 插件的主动推送"
+    "command": "dice",
+    "message_type": "group",       // "group"（群聊）或 "direct"（私聊）
+    "group_id": "group_12345",     // 群聊 ID（私聊为空）
+    "group": {                     // 群聊信息
+      "id": "group_12345",
+      "name": "交流群"
+    },
+    "sender_id": "user_67890",     // 发送者 ID
+    "sender": {                    // 发送者详情
+      "id": "user_67890",
+      "name": "张三",
+      "nickname": "三哥",
+      "authority": 1               // 0=Banned, 1=Member, 2=GroupAdmin, 3=GroupOwner, 4=Admin, 5=Owner
+    },
+    "protocol": "qbot",            // 协议平台（qbot, telegram, onebot 等）
+    "features": ["text", "image", "inline_keyboard"],
+    "message_id": "msg_abc",       // 消息唯一 ID
+    "raw": "/dice 6",              // 完整输入原始文本
+    "context_token": "..."         // 上下文 Token，用于回传
   }
   ```
 
-### 4. 监听聊天事件
+### 3. 消息回复与主动发送（支持内嵌键盘）
+- **回复文本消息**：`gorobot_reply_text(context_token, text)`
+  - 在指令或事件处理上下文中使用收到的 `context_token` 进行即时纯文本回复。
+- **回复富消息（含内嵌键盘）**：`gorobot_reply_message(req_json)`
+  - 支持向当前上下文回复携带内嵌按钮（Inline Keyboard）的消息。
+  ```json
+  {
+    "context_token": "...",
+    "text": "请选择你要执行的操作：",
+    "keyboard": {
+      "rows": [
+        [
+          { "text": "打开官网", "action": 0, "data": "https://example.com" },
+          { "text": "点击签到", "action": 2, "data": "/sign", "direct_send": true }
+        ]
+      ]
+    }
+  }
+  ```
+- **主动发消息**：`gorobot_send_message(req_json)`
+  - 主动向指定用户或群聊发送消息，同样支持可选的 `keyboard` 结构。
+  ```json
+  {
+    "context_id": "telegram",  // 机器人上下文 ID，留空默认首个可用适配器
+    "target_id": "12345678",   // 接收者 User ID 或 Group ID
+    "text": "你好，这是来自 Wasm 插件的主动推送",
+    "keyboard": {
+      "rows": [
+        [
+          { "text": "赞", "action": 1, "data": "like_event" }
+        ]
+      ]
+    }
+  }
+  ```
+
+> **内嵌按钮 (Inline Keyboard) 字段说明**：
+> - `action`: 按钮动作类型。`0`=打开 URL（`ActionURL`），`1`=回调事件（`ActionCallback`，如 Telegram callback_data / QQ INTERACTION_CREATE），`2`=指令型（`ActionCommand`）。
+> - `data`: 动作对应的数据（URL 地址、回调 payload 或待执行指令）。
+> - `direct_send`: 布尔值，仅指令型按钮支持（为 `true` 时在支持平台直接自动发送该指令）。
+
+### 4. 查询适配器支持特性 (Feature Discovery)
+- **事件上下文中内置**：传给插件的 `CommandEvent` 与 `MessageEventPayload` 已内置 `features` 字段数组（例如 `["text", "image", "markdown", "voice", "file", "inline_keyboard"]`），插件收到事件即可直接判断是否能发送内嵌按钮或 Markdown。
+- **主动查询函数**：`gorobot_get_features(req_json)`
+  - 支持通过当前会话 `context_token` 或机器人 `context_id` 主动探测平台支持特性。
+  ```json
+  // 请求示例
+  { "context_token": "..." }
+
+  // 响应示例
+  {
+    "success": true,
+    "features": ["text", "image", "markdown", "voice", "file", "inline_keyboard"]
+  }
+  ```
+
+### 5. 监听聊天事件
 - **函数名**：`gorobot_subscribe_event(req_json)`
 - **说明**：订阅通用事件（如 `message`）。每当收到聊天消息时回调插件指定的导出函数。
   ```json
@@ -113,8 +179,23 @@ Wasm 插件可以通过导入函数与 GoroBot 宿主进行双向交互。接口
     "handler": "on_message"
   }
   ```
+- **回调负载 (`MessageEventPayload`)**：
+  ```json
+  {
+    "message_type": "group",       // "group" 或 "direct"
+    "group_id": "group_12345",     // 群聊 ID（私聊为空）
+    "group": { "id": "group_12345", "name": "交流群" },
+    "sender_id": "user_67890",
+    "sender": { "id": "user_67890", "nickname": "三哥", "authority": 1 },
+    "protocol": "telegram",
+    "features": ["text", "image", "inline_keyboard"],
+    "text": "测试消息内容",
+    "timestamp": 1726272000,
+    "context_token": "..."
+  }
+  ```
 
-### 5. 网络访问（Outgoing HTTP）
+### 6. 网络访问（Outgoing HTTP）
 - **函数名**：`gorobot_http_request(req_json)`
 - **说明**：发起对外网络请求（支持 GET、POST、PUT、DELETE 等）。由于默认开放了 `AllowedHosts: ["*"]`，插件也可以直接使用 Extism PDK 内置的 HTTP 客户端。
 - **入参示例**：
@@ -128,7 +209,7 @@ Wasm 插件可以通过导入函数与 GoroBot 宿主进行双向交互。接口
   ```
 - **返回响应**：包含 `status_code`、`headers` 与 `body` 的 JSON 字符串。
 
-### 6. 网络监听（Incoming HTTP / Webhook）
+### 7. 网络监听（Incoming HTTP / Webhook）
 - **函数名**：`gorobot_listen_http(req_json)`
 - **说明**：由宿主代理监听指定的 HTTP 端口与路由。当外部 Webhook 或客户端请求到达时，由宿主转发给 Wasm 插件处理，插件返回的结果自动写回 HTTP 客户端。
 - **入参示例**：
@@ -160,7 +241,7 @@ Wasm 插件可以通过导入函数与 GoroBot 宿主进行双向交互。接口
     ```
 - **生命周期绑定**：当插件被重载或禁用时，宿主自动清理路由；若该端口上无其他活跃路由，对应的 HTTP 服务将自动优雅停止。
 
-### 7. 辅助文件系统操作
+### 8. 辅助文件系统操作
 - `gorobot_fs_read(path)`：读取 `data/<plugin_id>/` 内的文件内容。
 - `gorobot_fs_write(path, data)`：写入文件到 `data/<plugin_id>/`。
 - 内置防目录穿越逻辑，拦截所有试图逃逸数据目录的相对或绝对路径。

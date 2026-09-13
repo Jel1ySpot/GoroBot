@@ -27,34 +27,108 @@ type CommandOption struct {
 	Help      string `json:"help"`
 }
 
+// SenderInfo 描述消息发送者的身份详情
+type SenderInfo struct {
+	ID        string `json:"id"`
+	Name      string `json:"name,omitempty"`
+	Nickname  string `json:"nickname,omitempty"`
+	Avatar    string `json:"avatar,omitempty"`
+	Authority int    `json:"authority,omitempty"` // 0=Banned, 1=Member, 2=GroupAdmin, 3=GroupOwner, 4=Admin, 5=Owner
+}
+
+// GroupInfo 描述消息所属群聊详情
+type GroupInfo struct {
+	ID     string `json:"id"`
+	Name   string `json:"name,omitempty"`
+	Avatar string `json:"avatar,omitempty"`
+}
+
+// MessageElementPayload 描述结构化消息元素
+type MessageElementPayload struct {
+	Type    int    `json:"type"` // 0=Text, 1=Quote, 2=Mention, 3=Image, 4=Video, 5=File, 6=Voice, 7=Sticker, 8=Link, 9=InlineKeyboard, 10=Other
+	Content string `json:"content,omitempty"`
+	Source  string `json:"source,omitempty"`
+}
+
 // CommandEvent 是指令被触发时传给 Wasm 插件的上下文 JSON 结构
 type CommandEvent struct {
-	Command      string            `json:"command"`
-	Commands     []string          `json:"commands"`
-	SenderID     string            `json:"sender_id"`
-	Protocol     string            `json:"protocol"`
-	BotContextID string            `json:"context_id"`
-	Arguments    []string          `json:"arguments"`
-	KvArgs       map[string]string `json:"kv_args"`
-	Options      map[string]string `json:"options"`
-	Raw          string            `json:"raw"`
-	ContextToken string            `json:"context_token"`
+	Command      string                  `json:"command"`
+	Commands     []string                `json:"commands"`
+	MessageType  string                  `json:"message_type"`       // "group" 或 "direct"
+	GroupID      string                  `json:"group_id,omitempty"` // 群聊 ID（私聊为空）
+	Group        *GroupInfo              `json:"group,omitempty"`    // 群聊详情（若有）
+	SenderID     string                  `json:"sender_id"`
+	Sender       *SenderInfo             `json:"sender,omitempty"` // 发送者详情
+	Protocol     string                  `json:"protocol"`
+	BotContextID string                  `json:"context_id"`
+	Features     []string                `json:"features,omitempty"`
+	MessageID    string                  `json:"message_id,omitempty"`
+	Elements     []MessageElementPayload `json:"elements,omitempty"`
+	Timestamp    int64                   `json:"timestamp,omitempty"` // 秒级时间戳
+	Arguments    []string                `json:"arguments"`
+	KvArgs       map[string]string       `json:"kv_args"`
+	Options      map[string]string       `json:"options"`
+	Raw          string                  `json:"raw"`
+	ContextToken string                  `json:"context_token"`
 }
 
 // MessageEventPayload 是接收到聊天消息时传给 Wasm 插件的结构
 type MessageEventPayload struct {
-	Protocol     string `json:"protocol"`
-	BotContextID string `json:"context_id"`
-	SenderID     string `json:"sender_id"`
-	Text         string `json:"text"`
-	ContextToken string `json:"context_token"`
+	MessageType  string                  `json:"message_type"`       // "group" 或 "direct"
+	GroupID      string                  `json:"group_id,omitempty"` // 群聊 ID（私聊为空）
+	Group        *GroupInfo              `json:"group,omitempty"`    // 群聊详情（若有）
+	Protocol     string                  `json:"protocol"`
+	BotContextID string                  `json:"context_id"`
+	Features     []string                `json:"features,omitempty"`
+	MessageID    string                  `json:"message_id,omitempty"`
+	SenderID     string                  `json:"sender_id"`
+	Sender       *SenderInfo             `json:"sender,omitempty"` // 发送者详情
+	Text         string                  `json:"text"`
+	Elements     []MessageElementPayload `json:"elements,omitempty"`
+	Timestamp    int64                   `json:"timestamp,omitempty"` // 秒级时间戳
+	ContextToken string                  `json:"context_token"`
+}
+
+// InlineKeyboardButtonPayload 是 Wasm 插件构造内嵌按钮的数据结构
+type InlineKeyboardButtonPayload struct {
+	Text       string `json:"text"`
+	Action     int    `json:"action"` // 0: URL, 1: Callback, 2: Command
+	Data       string `json:"data"`
+	DirectSend bool   `json:"direct_send,omitempty"`
+	ID         string `json:"id,omitempty"`
+}
+
+// InlineKeyboardPayload 是 Wasm 插件构造内嵌键盘的数据结构
+type InlineKeyboardPayload struct {
+	Rows [][]InlineKeyboardButtonPayload `json:"rows"`
 }
 
 // SendMessageRequest 是 Wasm 插件主动发送消息的请求参数
 type SendMessageRequest struct {
-	BotContextID string `json:"context_id,omitempty"` // 可选，指定机器人上下文ID
-	TargetID     string `json:"target_id"`            // 接收者 ID (User/Group 或统一 Entity ID)
-	Text         string `json:"text"`                 // 发送的文本内容
+	BotContextID string                 `json:"context_id,omitempty"` // 可选，指定机器人上下文ID
+	TargetID     string                 `json:"target_id"`            // 接收者 ID (User/Group 或统一 Entity ID)
+	Text         string                 `json:"text"`                 // 发送的文本内容
+	Keyboard     *InlineKeyboardPayload `json:"keyboard,omitempty"`   // 可选内嵌键盘
+}
+
+// ReplyMessageRequest 是针对当前上下文的回复请求参数（支持带内嵌键盘）
+type ReplyMessageRequest struct {
+	ContextToken string                 `json:"context_token"`
+	Text         string                 `json:"text"`
+	Keyboard     *InlineKeyboardPayload `json:"keyboard,omitempty"`
+}
+
+// GetFeaturesRequest 查询适配器支持特性的请求
+type GetFeaturesRequest struct {
+	ContextToken string `json:"context_token,omitempty"` // 可选，通过事件或指令上下文 Token 查
+	BotContextID string `json:"context_id,omitempty"`    // 可选，直接通过机器人上下文 ID 查
+}
+
+// GetFeaturesResponse 查询适配器特性的响应
+type GetFeaturesResponse struct {
+	Success  bool     `json:"success"`
+	Features []string `json:"features"`
+	Error    string   `json:"error,omitempty"`
 }
 
 // SendMessageResponse 是主动发送消息后的返回结果

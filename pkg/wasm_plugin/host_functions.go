@@ -18,6 +18,64 @@ import (
 	"github.com/google/uuid"
 )
 
+// extractMessageDetails 从 MessageContext 解析消息基础信息、群聊/私聊类型、发送者与元素
+func extractMessageDetails(msgCtx botc.MessageContext) (msgType string, groupID string, group *GroupInfo, sender *SenderInfo, msgID string, elements []MessageElementPayload, ts int64) {
+	msgType = "direct"
+	if msgCtx == nil {
+		return
+	}
+	base := msgCtx.Message()
+	if base == nil {
+		return
+	}
+
+	msgID = base.ID
+	if !base.Time.IsZero() {
+		ts = base.Time.Unix()
+	}
+
+	if base.MessageType == botc.GroupMessage {
+		msgType = "group"
+	}
+
+	if base.Sender != nil {
+		// 群聊详情
+		if base.Sender.From != nil {
+			groupID = base.Sender.From.ID
+			group = &GroupInfo{
+				ID:     base.Sender.From.ID,
+				Name:   base.Sender.From.Name,
+				Avatar: base.Sender.From.Avatar,
+			}
+		}
+
+		// 发送者详情
+		sender = &SenderInfo{
+			Authority: int(base.Sender.Authority),
+		}
+		if base.Sender.User != nil {
+			if base.Sender.User.Base != nil {
+				sender.ID = base.Sender.User.Base.ID
+				sender.Name = base.Sender.User.Base.Name
+				sender.Avatar = base.Sender.User.Base.Avatar
+			}
+			sender.Nickname = base.Sender.User.Nickname
+		}
+	}
+
+	for _, el := range base.Elements {
+		if el != nil {
+			elements = append(elements, MessageElementPayload{
+				Type:    int(el.Type),
+				Content: el.Content,
+				Source:  el.Source,
+			})
+		}
+	}
+
+	return
+}
+
 // createDualHostFunction 创建两个相同行为的 HostFunction：一个注册在默认命名空间 "extism:host/user"，另一个在 "gorobot"
 func createDualHostFunction(name string, cb extism.HostFunctionStackCallback, params []extism.ValueType, returns []extism.ValueType) []extism.HostFunction {
 	f1 := extism.NewHostFunctionWithStack(name, cb, params, returns)
@@ -116,12 +174,33 @@ func (s *Service) createHostFunctions(inst *PluginInstance) []extism.HostFunctio
 				s.activeContextsMu.Unlock()
 			}()
 
+			var featureStrings []string
+			if prov, ok := cmdCtx.MessageContext.(botc.FeatureProvider); ok {
+				for _, f := range prov.Features() {
+					featureStrings = append(featureStrings, string(f))
+				}
+			} else if prov, ok := cmdCtx.BotContext().(botc.FeatureProvider); ok {
+				for _, f := range prov.Features() {
+					featureStrings = append(featureStrings, string(f))
+				}
+			}
+
+			msgType, groupID, group, sender, msgID, elements, ts := extractMessageDetails(cmdCtx)
+
 			cmdEv := CommandEvent{
 				Command:      def.Name,
 				Commands:     cmdCtx.Commands,
+				MessageType:  msgType,
+				GroupID:      groupID,
+				Group:        group,
 				SenderID:     cmdCtx.SenderID(),
+				Sender:       sender,
 				Protocol:     cmdCtx.Protocol(),
 				BotContextID: cmdCtx.BotContext().ID(),
+				Features:     featureStrings,
+				MessageID:    msgID,
+				Elements:     elements,
+				Timestamp:    ts,
 				Arguments:    cmdCtx.Arguments,
 				KvArgs:       cmdCtx.KvArgs,
 				Options:      cmdCtx.Options,
@@ -175,22 +254,22 @@ func (s *Service) createHostFunctions(inst *PluginInstance) []extism.HostFunctio
 		s.activeContextsMu.RUnlock()
 
 		if !ok || msgCtx == nil {
-			stack[0] = extism.EncodeI32(1)
+			stack[0] = 1
 			return
 		}
 
 		if _, err := msgCtx.ReplyText(text); err != nil {
 			s.logger.Failed("插件 %s 回复消息失败: %v", inst.id, err)
-			stack[0] = extism.EncodeI32(2)
+			stack[0] = 2
 			return
 		}
-		stack[0] = extism.EncodeI32(0)
+		stack[0] = 0
 	}
 	functions = append(functions, createDualHostFunction(
 		"gorobot_reply_text",
 		replyCb,
 		[]extism.ValueType{extism.ValueTypePTR, extism.ValueTypePTR},
-		[]extism.ValueType{extism.ValueTypeI32},
+		[]extism.ValueType{extism.ValueTypePTR},
 	)...)
 
 	// 4. 主动发送消息: gorobot_send_message(req_json) -> resp_json
@@ -218,7 +297,26 @@ func (s *Service) createHostFunctions(inst *PluginInstance) []extism.HostFunctio
 			return
 		}
 
-		_, err = botCtx.NewMessageBuilder().Text(req.Text).Send(req.TargetID)
+		builder := botCtx.NewMessageBuilder().Text(req.Text)
+		if req.Keyboard != nil && len(req.Keyboard.Rows) > 0 {
+			kb := botc.NewInlineKeyboard()
+			for _, r := range req.Keyboard.Rows {
+				var rowBtns []botc.InlineKeyboardButton
+				for _, b := range r {
+					rowBtns = append(rowBtns, botc.InlineKeyboardButton{
+						Text:       b.Text,
+						Action:     botc.ButtonActionType(b.Action),
+						Data:       b.Data,
+						DirectSend: b.DirectSend,
+						ID:         b.ID,
+					})
+				}
+				kb.AddRow(rowBtns...)
+			}
+			builder.InlineKeyboard(kb)
+		}
+
+		_, err = builder.Send(req.TargetID)
 		if err != nil {
 			s.writeJsonResponse(p, stack, SendMessageResponse{Success: false, Error: err.Error()})
 			return
@@ -229,6 +327,121 @@ func (s *Service) createHostFunctions(inst *PluginInstance) []extism.HostFunctio
 	functions = append(functions, createDualHostFunction(
 		"gorobot_send_message",
 		sendMsgCb,
+		[]extism.ValueType{extism.ValueTypePTR},
+		[]extism.ValueType{extism.ValueTypePTR},
+	)...)
+
+	// 4.1 上下文回复消息(带内嵌键盘支持): gorobot_reply_message(req_json) -> resp_json
+	replyMsgCb := func(ctx context.Context, p *extism.CurrentPlugin, stack []uint64) {
+		jsonStr, err := p.ReadString(stack[0])
+		if err != nil {
+			s.writeJsonResponse(p, stack, SendMessageResponse{Success: false, Error: err.Error()})
+			return
+		}
+
+		var req ReplyMessageRequest
+		if err := json.Unmarshal([]byte(jsonStr), &req); err != nil {
+			s.writeJsonResponse(p, stack, SendMessageResponse{Success: false, Error: fmt.Sprintf("解析参数失败: %v", err)})
+			return
+		}
+
+		s.activeContextsMu.RLock()
+		msgCtx, ok := s.activeContexts[req.ContextToken]
+		s.activeContextsMu.RUnlock()
+
+		if !ok || msgCtx == nil {
+			s.writeJsonResponse(p, stack, SendMessageResponse{Success: false, Error: "上下文已失效或不存在"})
+			return
+		}
+
+		builder := msgCtx.NewMessageBuilder().Text(req.Text)
+		if req.Keyboard != nil && len(req.Keyboard.Rows) > 0 {
+			kb := botc.NewInlineKeyboard()
+			for _, r := range req.Keyboard.Rows {
+				var rowBtns []botc.InlineKeyboardButton
+				for _, b := range r {
+					rowBtns = append(rowBtns, botc.InlineKeyboardButton{
+						Text:       b.Text,
+						Action:     botc.ButtonActionType(b.Action),
+						Data:       b.Data,
+						DirectSend: b.DirectSend,
+						ID:         b.ID,
+					})
+				}
+				kb.AddRow(rowBtns...)
+			}
+			builder.InlineKeyboard(kb)
+		}
+
+		_, err = builder.ReplyTo(msgCtx)
+		if err != nil {
+			s.writeJsonResponse(p, stack, SendMessageResponse{Success: false, Error: err.Error()})
+			return
+		}
+
+		s.writeJsonResponse(p, stack, SendMessageResponse{Success: true})
+	}
+	functions = append(functions, createDualHostFunction(
+		"gorobot_reply_message",
+		replyMsgCb,
+		[]extism.ValueType{extism.ValueTypePTR},
+		[]extism.ValueType{extism.ValueTypePTR},
+	)...)
+
+	// 4.2 查询适配器特性接口: gorobot_get_features(req_json) -> resp_json
+	getFeaturesCb := func(ctx context.Context, p *extism.CurrentPlugin, stack []uint64) {
+		jsonStr, err := p.ReadString(stack[0])
+		if err != nil {
+			s.writeJsonResponse(p, stack, GetFeaturesResponse{Success: false, Error: err.Error()})
+			return
+		}
+
+		var req GetFeaturesRequest
+		if err := json.Unmarshal([]byte(jsonStr), &req); err != nil {
+			s.writeJsonResponse(p, stack, GetFeaturesResponse{Success: false, Error: fmt.Sprintf("解析参数失败: %v", err)})
+			return
+		}
+
+		var provider botc.FeatureProvider
+
+		if req.ContextToken != "" {
+			s.activeContextsMu.RLock()
+			msgCtx := s.activeContexts[req.ContextToken]
+			s.activeContextsMu.RUnlock()
+			if msgCtx != nil {
+				if p, ok := msgCtx.(botc.FeatureProvider); ok {
+					provider = p
+				} else if p, ok := msgCtx.BotContext().(botc.FeatureProvider); ok {
+					provider = p
+				}
+			}
+		}
+
+		if provider == nil && req.BotContextID != "" {
+			botCtx := s.getBotContext(req.BotContextID)
+			if p, ok := botCtx.(botc.FeatureProvider); ok {
+				provider = p
+			}
+		}
+
+		if provider == nil {
+			s.writeJsonResponse(p, stack, GetFeaturesResponse{Success: false, Error: "未找到有效的特性提供者"})
+			return
+		}
+
+		var features []string
+		for _, f := range provider.Features() {
+			features = append(features, string(f))
+		}
+
+		s.writeJsonResponse(p, stack, GetFeaturesResponse{
+			Success:  true,
+			Features: features,
+		})
+	}
+	functions = append(functions, createDualHostFunction(
+		"gorobot_get_features",
+		getFeaturesCb,
 		[]extism.ValueType{extism.ValueTypePTR},
 		[]extism.ValueType{extism.ValueTypePTR},
 	)...)
@@ -269,11 +482,32 @@ func (s *Service) createHostFunctions(inst *PluginInstance) []extism.HostFunctio
 						s.activeContextsMu.Unlock()
 					}()
 
+					var featureStrings []string
+					if prov, ok := msgCtx.(botc.FeatureProvider); ok {
+						for _, f := range prov.Features() {
+							featureStrings = append(featureStrings, string(f))
+						}
+					} else if prov, ok := msgCtx.BotContext().(botc.FeatureProvider); ok {
+						for _, f := range prov.Features() {
+							featureStrings = append(featureStrings, string(f))
+						}
+					}
+
+					msgType, groupID, group, sender, msgID, elements, ts := extractMessageDetails(msgCtx)
+
 					payload := MessageEventPayload{
+						MessageType:  msgType,
+						GroupID:      groupID,
+						Group:        group,
 						Protocol:     msgCtx.Protocol(),
 						BotContextID: msgCtx.BotContext().ID(),
+						Features:     featureStrings,
+						MessageID:    msgID,
 						SenderID:     msgCtx.SenderID(),
+						Sender:       sender,
 						Text:         msgCtx.String(),
+						Elements:     elements,
+						Timestamp:    ts,
 						ContextToken: token,
 					}
 					b, err := json.Marshal(payload)
@@ -450,24 +684,24 @@ func (s *Service) createHostFunctions(inst *PluginInstance) []extism.HostFunctio
 		data, _ := p.ReadBytes(stack[1])
 		safePath, err := s.resolveDataPath(inst, relPath)
 		if err != nil {
-			stack[0] = extism.EncodeI32(1)
+			stack[0] = 1
 			return
 		}
 		if err := os.MkdirAll(filepath.Dir(safePath), 0755); err != nil {
-			stack[0] = extism.EncodeI32(2)
+			stack[0] = 2
 			return
 		}
 		if err := os.WriteFile(safePath, data, 0644); err != nil {
-			stack[0] = extism.EncodeI32(3)
+			stack[0] = 3
 			return
 		}
-		stack[0] = extism.EncodeI32(0)
+		stack[0] = 0
 	}
 	functions = append(functions, createDualHostFunction(
 		"gorobot_fs_write",
 		fsWriteCb,
 		[]extism.ValueType{extism.ValueTypePTR, extism.ValueTypePTR},
-		[]extism.ValueType{extism.ValueTypeI32},
+		[]extism.ValueType{extism.ValueTypePTR},
 	)...)
 
 	return functions
