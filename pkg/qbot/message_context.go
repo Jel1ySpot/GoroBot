@@ -69,7 +69,7 @@ func (m *MessageContext) Message() *botc.BaseMessage {
 
 func (m *MessageContext) SenderID() string {
 	if m.data.Author != nil {
-		return m.data.Author.ID
+		return FormatID("user", m.data.Author.ID)
 	}
 	return ""
 }
@@ -199,6 +199,7 @@ func parseSender(data *Message) *entity.Sender {
 				Name:   data.Author.Username,
 				Avatar: data.Author.Avatar,
 			},
+			Authority: entity.Member,
 		},
 	}
 	if data.GroupID != "" {

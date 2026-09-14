@@ -35,6 +35,7 @@ func (i *Instant) EventEmit(eventName string, args ...interface{}) error {
 }
 
 func (i *Instant) MessageEmit(msg botc.MessageContext) error {
+	i.ResolveSenderAuthority(msg)
 	// 中间件
 	return i.middleware.dispatch(msg, func() error {
 		go i.commands.CheckAliases(command.NewCommandContext(msg, msg.String()))
@@ -43,6 +44,9 @@ func (i *Instant) MessageEmit(msg botc.MessageContext) error {
 }
 
 func (i *Instant) CommandEmit(cmd *command.Context) {
+	if cmd != nil {
+		i.ResolveSenderAuthority(cmd.MessageContext)
+	}
 	// 中间件
 	_ = i.middleware.dispatch(cmd, func() error {
 		go i.event.Emit("message", cmd.MessageContext)

@@ -1,4 +1,5 @@
 {
   "log_level": 1,
-  "owner": {}
+  "owner": {},
+  "admin": {}
 }

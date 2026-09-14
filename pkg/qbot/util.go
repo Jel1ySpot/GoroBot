@@ -38,6 +38,7 @@ func ParseUser(user *User, member *Member) *entity.Sender {
 				Name:   user.Username,
 				Avatar: user.Avatar,
 			},
+			Authority: entity.Member,
 		},
 	}
 	if member != nil {

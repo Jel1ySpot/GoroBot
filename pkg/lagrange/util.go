@@ -55,6 +55,7 @@ func ReplyElementToMessage(service *Service, elem *LgrMessage.ReplyElement) *bot
 				Base: &entity.Base{
 					ID: GenUserID(elem.SenderUin),
 				},
+				Authority: entity.Member,
 			},
 			From: &entity.Base{
 				ID: GenGroupID(elem.GroupUin),
@@ -79,7 +80,8 @@ func SenderConv(u *LgrMessage.Sender, group *LgrMessage.GroupMessage) *entity.Se
 				ID:   GenUserID(u.Uin),
 				Name: u.Nickname,
 			},
-			Nickname: u.CardName,
+			Nickname:  u.CardName,
+			Authority: entity.Member,
 		},
 		From: from,
 	}

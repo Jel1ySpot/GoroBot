@@ -7,6 +7,7 @@ import (
 	"text/template"
 
 	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
+	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
 )
 
 var (
@@ -14,7 +15,17 @@ var (
 )
 
 func (s *Service) isOwner(ctx *command.Context) bool {
-	id, ok := s.grb.GetOwner(ctx.BotContext().ID())
+	if ctx.Authority() >= entity.Owner {
+		return true
+	}
+	var ctxID string
+	if botCtx := ctx.BotContext(); botCtx != nil {
+		ctxID = botCtx.ID()
+	}
+	if s.grb.IsOwner(ctxID, ctx.Protocol(), ctx.SenderID()) {
+		return true
+	}
+	id, ok := s.grb.GetOwner(ctxID)
 	return ok && id == ctx.SenderID()
 }
 

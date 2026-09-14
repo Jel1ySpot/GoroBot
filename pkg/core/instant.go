@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/command"
+	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/event"
 	"github.com/Jel1ySpot/GoroBot/pkg/core/logger"
 	"github.com/Jel1ySpot/GoroBot/pkg/util"
@@ -51,6 +53,7 @@ func Create() *Instant {
 		commands: command.NewCommandSystem(),
 		config: Config{
 			Owner:    make(map[string]string),
+			Admin:    make(map[string]StringList),
 			LogLevel: logger.Info,
 		},
 
@@ -74,6 +77,137 @@ func (i *Instant) GetLogger() logger.Inst {
 func (i *Instant) GetOwner(id string) (owner string, ok bool) {
 	owner, ok = i.config.Owner[id]
 	return
+}
+
+func (i *Instant) GetAdmins(id string) []string {
+	if i.config.Admin == nil {
+		return nil
+	}
+	return i.config.Admin[id]
+}
+
+// matchContext 匹配配置中的上下文/协议标识
+func matchContext(cfgKey, contextID, protocol string) bool {
+	if cfgKey == "*" || cfgKey == "default" {
+		return true
+	}
+	if contextID != "" && strings.EqualFold(cfgKey, contextID) {
+		return true
+	}
+	if protocol != "" && strings.EqualFold(cfgKey, protocol) {
+		return true
+	}
+	// 兼容 qq 别名映射（lagrange 和 onebot 均可配置为 qq）
+	if strings.EqualFold(cfgKey, "qq") {
+		p := strings.ToLower(protocol)
+		if p == "lagrange" || p == "onebot" || p == "qq" {
+			return true
+		}
+		c := strings.ToLower(contextID)
+		if strings.HasPrefix(c, "lagrange") || strings.HasPrefix(c, "onebot") || strings.HasPrefix(c, "qq") {
+			return true
+		}
+	}
+	return false
+}
+
+// matchID 匹配配置的用户 ID 与实际 senderID（支持 Universal ID 与原始 ID）
+func matchID(configured, senderID string) bool {
+	if configured == "" || senderID == "" {
+		return false
+	}
+	if configured == senderID {
+		return true
+	}
+	// 解析 senderID Universal ID (protocol:type&id)
+	if info, ok := entity.ParseInfo(senderID); ok {
+		for _, arg := range info.Args {
+			if arg == configured {
+				return true
+			}
+		}
+	}
+	// 解析 configured Universal ID
+	if info, ok := entity.ParseInfo(configured); ok {
+		for _, arg := range info.Args {
+			if arg == senderID {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// IsOwner 检查指定发送者是否为 Owner (等级 5)
+func (i *Instant) IsOwner(ctxID, protocol, senderID string) bool {
+	for cfgKey, cfgOwnerID := range i.config.Owner {
+		if matchContext(cfgKey, ctxID, protocol) && matchID(cfgOwnerID, senderID) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsAdmin 检查指定发送者是否为 Admin (等级 4)
+func (i *Instant) IsAdmin(ctxID, protocol, senderID string) bool {
+	for cfgKey, adminList := range i.config.Admin {
+		if matchContext(cfgKey, ctxID, protocol) {
+			for _, adminID := range adminList {
+				if matchID(adminID, senderID) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// ResolveSenderAuthority 自动修复默认权限并提升 Owner/Admin 等级
+func (i *Instant) ResolveSenderAuthority(msg botc.MessageContext) {
+	if msg == nil {
+		return
+	}
+	base := msg.Message()
+	if base == nil {
+		return
+	}
+	if base.Sender == nil {
+		base.Sender = &entity.Sender{}
+	}
+	if base.Sender.User == nil {
+		base.Sender.User = &entity.User{
+			Base: &entity.Base{
+				ID: msg.SenderID(),
+			},
+			Authority: entity.Member,
+		}
+	}
+
+	// 1. 修复默认值：若小于 Member(1)，兜底设为 Member(1)
+	if base.Sender.Authority < entity.Member {
+		base.Sender.Authority = entity.Member
+	}
+
+	var ctxID string
+	if botCtx := msg.BotContext(); botCtx != nil {
+		ctxID = botCtx.ID()
+	}
+	protocol := msg.Protocol()
+	senderID := msg.SenderID()
+
+	// 2. 自动赋值等级 5 (Owner)
+	if i.IsOwner(ctxID, protocol, senderID) {
+		base.Sender.Authority = entity.Owner
+		return
+	}
+
+	// 3. 自动赋值等级 4 (Admin)
+	if i.IsAdmin(ctxID, protocol, senderID) {
+		if base.Sender.Authority < entity.Admin {
+			base.Sender.Authority = entity.Admin
+		}
+		return
+	}
 }
 
 func (i *Instant) Use(service Service) {
@@ -178,12 +312,15 @@ func (i *Instant) Run() error {
 		if err := os.WriteFile(ConfigPath, DefaultConfig, 0644); err != nil {
 			return fmt.Errorf("failed to create config file: %v", err)
 		}
+		i.logger.Debug("已写入默认核心配置文件: %s", ConfigPath)
 		i.logger.Warning("Config file does not exist, using default config.")
 	}
 
+	i.logger.Debug("正在读取核心配置文件: %s", ConfigPath)
 	if err := conic.ReadConfig(); err != nil {
 		return err
 	}
+	i.logger.Debug("核心配置读取完成 (LogLevel: %d)", i.config.LogLevel)
 
 	i.logger.SetLogLevel(i.config.LogLevel)
 

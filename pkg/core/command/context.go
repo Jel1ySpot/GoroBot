@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
+	"github.com/Jel1ySpot/GoroBot/pkg/core/entity"
 	"github.com/google/shlex"
 )
 
@@ -69,6 +70,14 @@ func (ctx *Context) Clone() *Context {
 		KvArgs:         kvArgs,
 		Options:        options,
 	}
+}
+
+// Authority 获取当前消息发送者的权限等级
+func (ctx *Context) Authority() entity.Authority {
+	if ctx.MessageContext != nil && ctx.Message() != nil && ctx.Message().Sender != nil && ctx.Message().Sender.User != nil {
+		return ctx.Message().Sender.Authority
+	}
+	return entity.Member
 }
 
 func (ctx *Context) AppendArg(value string) error {

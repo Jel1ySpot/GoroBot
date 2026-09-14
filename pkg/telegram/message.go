@@ -74,7 +74,8 @@ func senderFromMessage(msg *models.Message) *entity.Sender {
 				ID:   genUserID(msg.From.ID),
 				Name: chooseName(msg.From.Username, msg.From.FirstName),
 			},
-			Nickname: msg.From.FirstName,
+			Nickname:  msg.From.FirstName,
+			Authority: entity.Member,
 		},
 	}
 
