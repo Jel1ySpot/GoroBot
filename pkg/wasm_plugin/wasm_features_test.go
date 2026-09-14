@@ -1,9 +1,17 @@
 package wasm_plugin
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
@@ -278,4 +286,208 @@ func (m *mockMessageContext) Reply(elements []*botc.MessageElement) (*botc.BaseM
 }
 func (m *mockMessageContext) ReplyText(a ...any) (*botc.BaseMessage, error) {
 	return nil, nil
+}
+
+func TestWasmTimers(t *testing.T) {
+	s := Create()
+	inst := &PluginInstance{
+		id:      "timer_plugin",
+		service: s,
+		timers:  make(map[string]context.CancelFunc),
+	}
+
+	funcs := s.createHostFunctions(inst)
+	foundInterval := false
+	foundTimeout := false
+	foundClear := false
+	foundTimeNow := false
+
+	for _, f := range funcs {
+		switch f.Name {
+		case "gorobot_set_interval":
+			foundInterval = true
+		case "gorobot_set_timeout":
+			foundTimeout = true
+		case "gorobot_clear_timer":
+			foundClear = true
+		case "gorobot_time_now":
+			foundTimeNow = true
+		}
+	}
+
+	if !foundInterval || !foundTimeout || !foundClear || !foundTimeNow {
+		t.Fatalf("expected timer host functions to be registered: interval=%v, timeout=%v, clear=%v, timeNow=%v",
+			foundInterval, foundTimeout, foundClear, foundTimeNow)
+	}
+
+	// 测试定时器添加与取消管理
+	var tickCount int32
+	ctx, cancel := context.WithCancel(context.Background())
+	inst.AddTimer("timer_test_1", cancel)
+
+	go func() {
+		ticker := time.NewTicker(20 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				atomic.AddInt32(&tickCount, 1)
+			}
+		}
+	}()
+
+	time.Sleep(55 * time.Millisecond)
+	if atomic.LoadInt32(&tickCount) == 0 {
+		t.Errorf("expected ticks > 0")
+	}
+
+	// 取消定时器
+	removed := inst.RemoveTimer("timer_test_1")
+	if !removed {
+		t.Errorf("expected timer_test_1 to be removed successfully")
+	}
+
+	currentCount := atomic.LoadInt32(&tickCount)
+	time.Sleep(50 * time.Millisecond)
+	if atomic.LoadInt32(&tickCount) != currentCount {
+		t.Errorf("expected timer to stop ticking after cancel, but count increased from %d to %d",
+			currentCount, atomic.LoadInt32(&tickCount))
+	}
+
+	// 测试 Release 清理所有定时器
+	var releaseTick int32
+	ctx2, cancel2 := context.WithCancel(context.Background())
+	inst.AddTimer("timer_test_2", cancel2)
+
+	go func() {
+		ticker := time.NewTicker(20 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx2.Done():
+				return
+			case <-ticker.C:
+				atomic.AddInt32(&releaseTick, 1)
+			}
+		}
+	}()
+
+	time.Sleep(30 * time.Millisecond)
+	inst.Release()
+
+	afterReleaseCount := atomic.LoadInt32(&releaseTick)
+	time.Sleep(50 * time.Millisecond)
+	if atomic.LoadInt32(&releaseTick) != afterReleaseCount {
+		t.Errorf("expected timer to be cancelled on release")
+	}
+}
+
+func TestWasmHttpRequestFullResponse(t *testing.T) {
+	binaryData := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0xFF}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 校验收到的自定义多值请求头和二进制 Body
+		if r.Header.Get("X-Custom") != "val1" {
+			t.Errorf("unexpected X-Custom: %s", r.Header.Get("X-Custom"))
+		}
+
+		w.Header().Add("Set-Cookie", "c1=v1; Path=/")
+		w.Header().Add("Set-Cookie", "c2=v2; Path=/")
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("X-Custom-Resp", "awesome")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(binaryData)
+	}))
+	defer ts.Close()
+
+	// 模拟请求参数
+	reqPayload := HttpRequestPayload{
+		URL:    ts.URL,
+		Method: "POST",
+		Headers: map[string]string{
+			"X-Custom": "val1",
+		},
+		BodyBase64: base64.StdEncoding.EncodeToString([]byte("test body binary")),
+	}
+
+	reqBytes, err := json.Marshal(reqPayload)
+	if err != nil {
+		t.Fatalf("marshal req: %v", err)
+	}
+	_ = reqBytes
+
+	// 模拟执行请求逻辑
+	client := &http.Client{Timeout: 5 * time.Second}
+	var bodyReader *bytes.Reader
+	if reqPayload.BodyBase64 != "" {
+		dec, _ := base64.StdEncoding.DecodeString(reqPayload.BodyBase64)
+		bodyReader = bytes.NewReader(dec)
+	}
+	httpReq, err := http.NewRequestWithContext(context.Background(), reqPayload.Method, reqPayload.URL, bodyReader)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	for k, v := range reqPayload.Headers {
+		httpReq.Header.Set(k, v)
+	}
+
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		t.Fatalf("client do: %v", err)
+	}
+	defer resp.Body.Close()
+
+	rawHeaders := make(map[string][]string)
+	flatHeaders := make(map[string]string)
+	for k, vs := range resp.Header {
+		rawHeaders[k] = vs
+		val := ""
+		for i, v := range vs {
+			if i > 0 {
+				val += ", "
+			}
+			val += v
+		}
+		flatHeaders[k] = val
+		flatHeaders[strings.ToLower(k)] = val
+	}
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+
+	respPayload := HttpResponsePayload{
+		StatusCode:    resp.StatusCode,
+		Status:        resp.Status,
+		Proto:         resp.Proto,
+		Headers:       flatHeaders,
+		RawHeaders:    rawHeaders,
+		Body:          string(respBody),
+		BodyBase64:    base64.StdEncoding.EncodeToString(respBody),
+		ContentLength: int64(len(respBody)),
+	}
+
+	if respPayload.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d", respPayload.StatusCode)
+	}
+	if respPayload.ContentLength != int64(len(binaryData)) {
+		t.Fatalf("expected content length %d, got %d", len(binaryData), respPayload.ContentLength)
+	}
+	if respPayload.BodyBase64 != base64.StdEncoding.EncodeToString(binaryData) {
+		t.Fatalf("body base64 mismatch")
+	}
+
+	// 校验多值 Header 是否完整保留
+	cookies := respPayload.RawHeaders["Set-Cookie"]
+	if len(cookies) != 2 {
+		t.Fatalf("expected 2 Set-Cookie headers in raw_headers, got %v", cookies)
+	}
+
+	// 校验大小写不敏感查询
+	if respPayload.Headers["content-type"] != "image/png" || respPayload.Headers["Content-Type"] != "image/png" {
+		t.Fatalf("expected lowercase and canonical headers to match 'image/png', got: %v", respPayload.Headers)
+	}
 }

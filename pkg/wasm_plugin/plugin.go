@@ -21,6 +21,9 @@ type PluginInstance struct {
 	commandReleases []func()
 	eventReleases   []func()
 
+	timersMu sync.Mutex
+	timers   map[string]context.CancelFunc
+
 	service *Service
 }
 
@@ -48,6 +51,7 @@ func newPluginInstance(s *Service, id string, wasmPath string) (*PluginInstance,
 		path:    absWasmPath,
 		dataDir: absDataDir,
 		service: s,
+		timers:  make(map[string]context.CancelFunc),
 	}
 
 	manifest := extism.Manifest{
@@ -154,6 +158,16 @@ func (inst *PluginInstance) Release() {
 		inst.service.cleanupPluginHttpRoutes(inst.id)
 	}
 
+	// 取消并停止该插件创建的所有定时任务
+	inst.timersMu.Lock()
+	for _, cancel := range inst.timers {
+		if cancel != nil {
+			cancel()
+		}
+	}
+	inst.timers = make(map[string]context.CancelFunc)
+	inst.timersMu.Unlock()
+
 	// 关闭 Wasm 模块实例
 	inst.mu.Lock()
 	if inst.plugin != nil {
@@ -161,4 +175,35 @@ func (inst *PluginInstance) Release() {
 		inst.plugin = nil
 	}
 	inst.mu.Unlock()
+}
+
+// AddTimer 记录并启动一个受控的定时任务
+func (inst *PluginInstance) AddTimer(id string, cancel context.CancelFunc) {
+	inst.timersMu.Lock()
+	defer inst.timersMu.Unlock()
+	if inst.timers == nil {
+		inst.timers = make(map[string]context.CancelFunc)
+	}
+	inst.timers[id] = cancel
+}
+
+// RemoveTimer 移除并取消一个定时任务
+func (inst *PluginInstance) RemoveTimer(id string) bool {
+	inst.timersMu.Lock()
+	defer inst.timersMu.Unlock()
+	if cancel, ok := inst.timers[id]; ok {
+		if cancel != nil {
+			cancel()
+		}
+		delete(inst.timers, id)
+		return true
+	}
+	return false
+}
+
+// isReleased 判断插件是否已释放
+func (inst *PluginInstance) isReleased() bool {
+	inst.mu.Lock()
+	defer inst.mu.Unlock()
+	return inst.plugin == nil
 }

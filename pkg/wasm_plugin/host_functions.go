@@ -1,7 +1,9 @@
 package wasm_plugin
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	GoroBot "github.com/Jel1ySpot/GoroBot/pkg/core"
 	botc "github.com/Jel1ySpot/GoroBot/pkg/core/bot_context"
@@ -590,9 +593,21 @@ func (s *Service) createHostFunctions(inst *PluginInstance) []extism.HostFunctio
 			timeout = 15 * time.Second
 		}
 		client := &http.Client{Timeout: timeout}
+		if req.FollowRedirects != nil && !*req.FollowRedirects {
+			client.CheckRedirect = func(r *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			}
+		}
 
 		var bodyReader io.Reader
-		if req.Body != "" {
+		if req.BodyBase64 != "" {
+			decoded, decErr := base64.StdEncoding.DecodeString(req.BodyBase64)
+			if decErr != nil {
+				s.writeJsonResponse(p, stack, HttpResponsePayload{Error: fmt.Sprintf("Base64 解码请求体失败: %v", decErr)})
+				return
+			}
+			bodyReader = bytes.NewReader(decoded)
+		} else if req.Body != "" {
 			bodyReader = strings.NewReader(req.Body)
 		}
 
@@ -605,6 +620,11 @@ func (s *Service) createHostFunctions(inst *PluginInstance) []extism.HostFunctio
 		for k, v := range req.Headers {
 			httpReq.Header.Set(k, v)
 		}
+		for k, vs := range req.RawHeaders {
+			for _, v := range vs {
+				httpReq.Header.Add(k, v)
+			}
+		}
 
 		resp, err := client.Do(httpReq)
 		if err != nil {
@@ -613,21 +633,39 @@ func (s *Service) createHostFunctions(inst *PluginInstance) []extism.HostFunctio
 		}
 		defer resp.Body.Close()
 
-		respBody, err := io.ReadAll(resp.Body)
-		if err != nil {
-			s.writeJsonResponse(p, stack, HttpResponsePayload{Error: err.Error()})
-			return
+		respBody, readErr := io.ReadAll(resp.Body)
+		var errMsg string
+		if readErr != nil {
+			errMsg = fmt.Sprintf("读取响应体失败: %v", readErr)
 		}
 
-		respHeaders := make(map[string]string)
-		for k := range resp.Header {
-			respHeaders[k] = resp.Header.Get(k)
+		rawHeaders := make(map[string][]string)
+		flatHeaders := make(map[string]string)
+		for k, vs := range resp.Header {
+			rawHeaders[k] = vs
+			joinedVal := strings.Join(vs, ", ")
+			flatHeaders[k] = joinedVal
+			flatHeaders[strings.ToLower(k)] = joinedVal
+		}
+
+		b64Body := base64.StdEncoding.EncodeToString(respBody)
+		var textBody string
+		if utf8.Valid(respBody) {
+			textBody = string(respBody)
+		} else {
+			textBody = string(respBody)
 		}
 
 		s.writeJsonResponse(p, stack, HttpResponsePayload{
-			StatusCode: resp.StatusCode,
-			Headers:    respHeaders,
-			Body:       string(respBody),
+			StatusCode:    resp.StatusCode,
+			Status:        resp.Status,
+			Proto:         resp.Proto,
+			Headers:       flatHeaders,
+			RawHeaders:    rawHeaders,
+			Body:          textBody,
+			BodyBase64:    b64Body,
+			ContentLength: int64(len(respBody)),
+			Error:         errMsg,
 		})
 	}
 	functions = append(functions, createDualHostFunction(
@@ -730,6 +768,194 @@ func (s *Service) createHostFunctions(inst *PluginInstance) []extism.HostFunctio
 		"gorobot_fs_write",
 		fsWriteCb,
 		[]extism.ValueType{extism.ValueTypePTR, extism.ValueTypePTR},
+		[]extism.ValueType{extism.ValueTypePTR},
+	)...)
+
+	// 9. 设置周期性轮询定时器: gorobot_set_interval(req_json) -> resp_json
+	setIntervalCb := func(ctx context.Context, p *extism.CurrentPlugin, stack []uint64) {
+		jsonStr, err := p.ReadString(stack[0])
+		if err != nil {
+			s.writeJsonResponse(p, stack, SetTimerResponse{Success: false, Error: err.Error()})
+			return
+		}
+
+		var req SetTimerRequest
+		if err := json.Unmarshal([]byte(jsonStr), &req); err != nil {
+			s.writeJsonResponse(p, stack, SetTimerResponse{Success: false, Error: fmt.Sprintf("解析参数失败: %v", err)})
+			return
+		}
+
+		if req.IntervalMs <= 0 {
+			s.writeJsonResponse(p, stack, SetTimerResponse{Success: false, Error: "interval_ms 必须大于 0"})
+			return
+		}
+
+		handler := req.Handler
+		if handler == "" {
+			handler = "on_interval"
+		}
+
+		timerID := "timer_" + uuid.NewString()
+		timerCtx, cancel := context.WithCancel(context.Background())
+		inst.AddTimer(timerID, cancel)
+
+		interval := time.Duration(req.IntervalMs) * time.Millisecond
+		payload := req.Payload
+
+		go func() {
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
+			defer inst.RemoveTimer(timerID)
+
+			for {
+				select {
+				case <-timerCtx.Done():
+					return
+				case <-ticker.C:
+					if inst.isReleased() {
+						return
+					}
+					_, err := inst.Call(handler, []byte(payload))
+					if err != nil {
+						if inst.isReleased() {
+							return
+						}
+						s.logger.Warning("插件 %s 执行定时轮询任务 %s (%s) 失败: %v", inst.id, timerID, handler, err)
+					}
+				}
+			}
+		}()
+
+		s.writeJsonResponse(p, stack, SetTimerResponse{
+			Success: true,
+			TimerID: timerID,
+		})
+	}
+	functions = append(functions, createDualHostFunction(
+		"gorobot_set_interval",
+		setIntervalCb,
+		[]extism.ValueType{extism.ValueTypePTR},
+		[]extism.ValueType{extism.ValueTypePTR},
+	)...)
+
+	// 10. 设置单次延时定时器: gorobot_set_timeout(req_json) -> resp_json
+	setTimeoutCb := func(ctx context.Context, p *extism.CurrentPlugin, stack []uint64) {
+		jsonStr, err := p.ReadString(stack[0])
+		if err != nil {
+			s.writeJsonResponse(p, stack, SetTimerResponse{Success: false, Error: err.Error()})
+			return
+		}
+
+		var req SetTimerRequest
+		if err := json.Unmarshal([]byte(jsonStr), &req); err != nil {
+			s.writeJsonResponse(p, stack, SetTimerResponse{Success: false, Error: fmt.Sprintf("解析参数失败: %v", err)})
+			return
+		}
+
+		if req.DelayMs < 0 {
+			s.writeJsonResponse(p, stack, SetTimerResponse{Success: false, Error: "delay_ms 不能小于 0"})
+			return
+		}
+
+		handler := req.Handler
+		if handler == "" {
+			handler = "on_timeout"
+		}
+
+		timerID := "timer_" + uuid.NewString()
+		timerCtx, cancel := context.WithCancel(context.Background())
+		inst.AddTimer(timerID, cancel)
+
+		delay := time.Duration(req.DelayMs) * time.Millisecond
+		payload := req.Payload
+
+		go func() {
+			defer inst.RemoveTimer(timerID)
+			select {
+			case <-timerCtx.Done():
+				return
+			case <-time.After(delay):
+				if inst.isReleased() {
+					return
+				}
+				_, err := inst.Call(handler, []byte(payload))
+				if err != nil && !inst.isReleased() {
+					s.logger.Warning("插件 %s 执行延时任务 %s (%s) 失败: %v", inst.id, timerID, handler, err)
+				}
+			}
+		}()
+
+		s.writeJsonResponse(p, stack, SetTimerResponse{
+			Success: true,
+			TimerID: timerID,
+		})
+	}
+	functions = append(functions, createDualHostFunction(
+		"gorobot_set_timeout",
+		setTimeoutCb,
+		[]extism.ValueType{extism.ValueTypePTR},
+		[]extism.ValueType{extism.ValueTypePTR},
+	)...)
+
+	// 11. 取消定时器: gorobot_clear_timer(req_json) -> resp_json
+	clearTimerCb := func(ctx context.Context, p *extism.CurrentPlugin, stack []uint64) {
+		jsonStr, err := p.ReadString(stack[0])
+		if err != nil {
+			s.writeJsonResponse(p, stack, ClearTimerResponse{Success: false, Error: err.Error()})
+			return
+		}
+
+		var req ClearTimerRequest
+		if err := json.Unmarshal([]byte(jsonStr), &req); err != nil {
+			s.writeJsonResponse(p, stack, ClearTimerResponse{Success: false, Error: fmt.Sprintf("解析参数失败: %v", err)})
+			return
+		}
+
+		if req.TimerID == "" {
+			s.writeJsonResponse(p, stack, ClearTimerResponse{Success: false, Error: "timer_id 不能为空"})
+			return
+		}
+
+		ok := inst.RemoveTimer(req.TimerID)
+		if !ok {
+			s.writeJsonResponse(p, stack, ClearTimerResponse{Success: false, Error: "未找到该定时器或已被清理"})
+			return
+		}
+
+		s.writeJsonResponse(p, stack, ClearTimerResponse{Success: true})
+	}
+	functions = append(functions, createDualHostFunction(
+		"gorobot_clear_timer",
+		clearTimerCb,
+		[]extism.ValueType{extism.ValueTypePTR},
+		[]extism.ValueType{extism.ValueTypePTR},
+	)...)
+	functions = append(functions, createDualHostFunction(
+		"gorobot_clear_interval",
+		clearTimerCb,
+		[]extism.ValueType{extism.ValueTypePTR},
+		[]extism.ValueType{extism.ValueTypePTR},
+	)...)
+	functions = append(functions, createDualHostFunction(
+		"gorobot_clear_timeout",
+		clearTimerCb,
+		[]extism.ValueType{extism.ValueTypePTR},
+		[]extism.ValueType{extism.ValueTypePTR},
+	)...)
+
+	// 12. 获取系统当前时间: gorobot_time_now() -> resp_json
+	timeNowCb := func(ctx context.Context, p *extism.CurrentPlugin, stack []uint64) {
+		now := time.Now()
+		s.writeJsonResponse(p, stack, TimeNowResponse{
+			Unix:      now.Unix(),
+			UnixMilli: now.UnixMilli(),
+			ISO8601:   now.Format(time.RFC3339),
+		})
+	}
+	functions = append(functions, createDualHostFunction(
+		"gorobot_time_now",
+		timeNowCb,
+		[]extism.ValueType{},
 		[]extism.ValueType{extism.ValueTypePTR},
 	)...)
 

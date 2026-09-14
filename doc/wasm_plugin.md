@@ -197,17 +197,39 @@ Wasm 插件可以通过导入函数与 GoroBot 宿主进行双向交互。接口
 
 ### 6. 网络访问（Outgoing HTTP）
 - **函数名**：`gorobot_http_request(req_json)`
-- **说明**：发起对外网络请求（支持 GET、POST、PUT、DELETE 等）。由于默认开放了 `AllowedHosts: ["*"]`，插件也可以直接使用 Extism PDK 内置的 HTTP 客户端。
+- **说明**：发起对外网络请求（支持 GET、POST、PUT、DELETE 等）。
 - **入参示例**：
   ```json
   {
     "url": "https://api.weather.com/v1/today",
     "method": "GET",
     "headers": {"User-Agent": "GoroBot-Wasm"},
-    "timeout_ms": 5000
+    "raw_headers": {"X-Custom": ["val1", "val2"]},  // 可选：多值 Header 数组
+    "body": "...",                                  // 可选：文本请求体
+    "body_base64": "...",                           // 可选：二进制请求体 Base64 编码
+    "timeout_ms": 5000,
+    "follow_redirects": true                        // 可选：是否自动跟随重定向（默认 true）
   }
   ```
-- **返回响应**：包含 `status_code`、`headers` 与 `body` 的 JSON 字符串。
+- **完整返回响应结构 (`HttpResponsePayload`)**：
+  ```json
+  {
+    "status_code": 200,
+    "status": "200 OK",
+    "proto": "HTTP/1.1",
+    "headers": {                                    // 扁平化映射（支持规范键与全小写键查询）
+      "Content-Type": "application/json; charset=utf-8",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "raw_headers": {                                // 完整多值响应头数组
+      "Set-Cookie": ["sid=abc; Path=/", "token=xyz; Path=/"]
+    },
+    "body": "{\"temp\": 25}",                       // 响应体文本内容
+    "body_base64": "eyJ0ZW1wIjogMjV9",              // 完整响应体 Base64 编码（图片、二进制、非 UTF-8 数据 100% 完整无损）
+    "content_length": 13,                           // 实际读取的响应体字节数
+    "error": ""                                     // 错误信息（若有）
+  }
+  ```
 
 ### 7. 网络监听（Incoming HTTP / Webhook）
 - **函数名**：`gorobot_listen_http(req_json)`
@@ -245,6 +267,44 @@ Wasm 插件可以通过导入函数与 GoroBot 宿主进行双向交互。接口
 - `gorobot_fs_read(path)`：读取 `data/<plugin_id>/` 内的文件内容。
 - `gorobot_fs_write(path, data)`：写入文件到 `data/<plugin_id>/`。
 - 内置防目录穿越逻辑，拦截所有试图逃逸数据目录的相对或绝对路径。
+
+### 9. 定时器与周期性轮询任务 (Timers & Polling)
+
+由于 Wasm 为单线程沙箱模型，不能在插件中直接执行死循环或睡眠。宿主为 Wasm 插件提供了后台协程驱动的定时调度能力：
+
+- **设置周期性轮询定时器**：`gorobot_set_interval(req_json)`
+  - 向宿主申请启动一个周期定时器，定时调用插件指定的导出函数。
+  - **入参格式**：
+    ```json
+    {
+      "interval_ms": 60000,           // 触发间隔（毫秒），必须大于 0
+      "handler": "on_poll",          // 触发时调用的 Wasm 导出函数名，默认 "on_interval"
+      "payload": "optional_data"     // 可选，传递给处理函数的自定义字符串
+    }
+    ```
+  - **响应格式**：
+    ```json
+    {
+      "success": true,
+      "timer_id": "timer_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    }
+    ```
+- **设置单次延时任务**：`gorobot_set_timeout(req_json)`
+  - 延时执行一次插件指定的导出函数（默认函数名为 "on_timeout"）。
+  - **入参格式**：
+    ```json
+    {
+      "delay_ms": 5000,
+      "handler": "on_delay",
+      "payload": "optional_data"
+    }
+    ```
+- **清除/取消定时器**：`gorobot_clear_timer(req_json)`
+  - 传入 `timer_id` 取消正在运行的定时器或延时任务（亦支持 `gorobot_clear_interval` 与 `gorobot_clear_timeout` 别名）。
+  - **入参格式**：`{"timer_id": "..."}`
+- **获取系统当前时间**：`gorobot_time_now()`
+  - 返回当前系统时间戳：`{"unix": 1726300000, "unix_milli": 1726300000000, "iso8601": "..."}`。
+- **生命周期绑定**：当插件被禁用、重载或卸载时，宿主会自动取消并清理该插件注册的所有未执行定时器，避免协程泄露。
 
 ---
 

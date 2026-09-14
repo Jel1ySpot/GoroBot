@@ -116,7 +116,7 @@ func TestHttpListenRoute(t *testing.T) {
 
 func TestExtismWasmExecutionWithFS(t *testing.T) {
 	// 尝试寻找 extism go-sdk 中自带的 count_vowels.wasm 测试
-	modPath := filepath.Join(os.Getenv("GOPATH"), "pkg", "mod")
+	modPath := filepath.Join(os.Getenv("GOPATH"), "pkg", "mod", "github.com", "extism")
 	var wasmFile string
 
 	// 在 mod 缓存中查找 count_vowels.wasm

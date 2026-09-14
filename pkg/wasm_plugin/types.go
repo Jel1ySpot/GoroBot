@@ -141,19 +141,27 @@ type SendMessageResponse struct {
 
 // HttpRequestPayload 是插件调用网络请求时的入参
 type HttpRequestPayload struct {
-	URL       string            `json:"url"`
-	Method    string            `json:"method,omitempty"` // 默认 "GET"
-	Headers   map[string]string `json:"headers,omitempty"`
-	Body      string            `json:"body,omitempty"`
-	TimeoutMs int64             `json:"timeout_ms,omitempty"`
+	URL             string              `json:"url"`
+	Method          string              `json:"method,omitempty"` // 默认 "GET"
+	Headers         map[string]string   `json:"headers,omitempty"`
+	RawHeaders      map[string][]string `json:"raw_headers,omitempty"`      // 支持传递多值头部
+	Body            string              `json:"body,omitempty"`             // 文本请求体
+	BodyBase64      string              `json:"body_base64,omitempty"`      // 可选 Base64 编码请求体（用于发送二进制数据）
+	TimeoutMs       int64               `json:"timeout_ms,omitempty"`
+	FollowRedirects *bool               `json:"follow_redirects,omitempty"` // 是否自动跟随重定向，默认 true
 }
 
-// HttpResponsePayload 是网络请求的响应数据
+// HttpResponsePayload 是网络请求的响应数据，包含完整的状态、响应头与响应体
 type HttpResponsePayload struct {
-	StatusCode int               `json:"status_code"`
-	Headers    map[string]string `json:"headers,omitempty"`
-	Body       string            `json:"body"`
-	Error      string            `json:"error,omitempty"`
+	StatusCode    int                 `json:"status_code"`
+	Status        string              `json:"status,omitempty"`     // 状态说明，如 "200 OK"
+	Proto         string              `json:"proto,omitempty"`      // 协议版本，如 "HTTP/1.1"
+	Headers       map[string]string   `json:"headers"`              // 扁平化 Header（支持规范名称及全小写名称查询）
+	RawHeaders    map[string][]string `json:"raw_headers"`          // 完整多值 Header 映射（如 Set-Cookie: [...]）
+	Body          string              `json:"body"`                 // 响应体文本内容
+	BodyBase64    string              `json:"body_base64"`          // 响应体完整 Base64 编码（确保图片、压缩包、二进制与特殊字符不损坏）
+	ContentLength int64               `json:"content_length"`       // 响应体字节长度
+	Error         string              `json:"error,omitempty"`
 }
 
 // HttpListenRequest 是插件向宿主申请监听 HTTP 网络服务的请求结构
@@ -191,4 +199,37 @@ type HttpOutgoingResponse struct {
 type SubscribeEventRequest struct {
 	Event   string `json:"event"`             // 事件名，例如 "message"
 	Handler string `json:"handler,omitempty"` // 触发时回调的 Wasm 导出函数名
+}
+
+// SetTimerRequest 是设置定时或轮询任务的请求参数
+type SetTimerRequest struct {
+	IntervalMs int64  `json:"interval_ms,omitempty"` // 周期触发间隔（毫秒），用于 set_interval
+	DelayMs    int64  `json:"delay_ms,omitempty"`    // 延时触发时间（毫秒），用于 set_timeout
+	Handler    string `json:"handler,omitempty"`     // 触发时回调的 Wasm 导出函数名
+	Payload    string `json:"payload,omitempty"`     // 可选传递给处理函数的参数字符串
+}
+
+// SetTimerResponse 是设置定时任务后的响应
+type SetTimerResponse struct {
+	Success bool   `json:"success"`
+	TimerID string `json:"timer_id,omitempty"`
+	Error   string `json:"error,omitempty"`
+}
+
+// ClearTimerRequest 是取消定时任务的请求参数
+type ClearTimerRequest struct {
+	TimerID string `json:"timer_id"`
+}
+
+// ClearTimerResponse 是取消定时任务后的响应
+type ClearTimerResponse struct {
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+}
+
+// TimeNowResponse 是获取当前系统时间的响应
+type TimeNowResponse struct {
+	Unix      int64  `json:"unix"`       // 秒级时间戳
+	UnixMilli int64  `json:"unix_milli"` // 毫秒级时间戳
+	ISO8601   string `json:"iso8601"`    // ISO8601 格式时间
 }
