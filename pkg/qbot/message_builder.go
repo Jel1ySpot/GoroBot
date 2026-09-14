@@ -42,6 +42,14 @@ func (m *MessageBuilder) Text(text string) botc.MessageBuilder {
 	return m
 }
 
+func (m *MessageBuilder) Markdown(content string) botc.MessageBuilder {
+	m.MsgType = 2
+	m.MessageToCreate.Markdown = &Markdown{
+		Content: content,
+	}
+	return m
+}
+
 func (m *MessageBuilder) Quote(msg *botc.BaseMessage) botc.MessageBuilder {
 	info, ok := entity.ParseInfo(msg.ID)
 	if !ok || info.Protocol != m.Protocol() || info.Args[0] != "msg" {
@@ -260,6 +268,8 @@ func (m *MessageBuilder) ApplyElements(elements []*botc.MessageElement) *Message
 			if kb, err := botc.ParseInlineKeyboard(el.Content); err == nil {
 				m.InlineKeyboard(kb)
 			}
+		case botc.MarkdownElement:
+			m.Markdown(el.Content)
 		}
 	}
 	return m

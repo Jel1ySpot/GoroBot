@@ -81,9 +81,11 @@ func (s *Service) initConfig() error {
 		s.logInfo("QBot 默认配置文件已生成: %s", configFile)
 	}
 
+	s.logDebug("正在读取 QBot 配置文件: %s", configFile)
 	if err := c.ReadConfig(); err != nil {
 		return err
 	}
+	s.logDebug("QBot 配置文件读取完成 (mode: %s, debug: %v)", s.config.Mode, s.config.Debug)
 
 	return nil
 }

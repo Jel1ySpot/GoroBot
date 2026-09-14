@@ -174,7 +174,7 @@ func TestTokenManager(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(tokenResp{
 			AccessToken: "mock_token_12345",
-			ExpiresIn:   7200,
+			ExpiresIn:   json.Number("7200"),
 		})
 	}))
 	defer server.Close()
@@ -378,3 +378,52 @@ func TestFeaturesAndKeyboard(t *testing.T) {
 		t.Errorf("unexpected btn2 action: %+v", btn2.Action)
 	}
 }
+
+func TestTokenManager_FetchToken(t *testing.T) {
+	// 测试 QQ 开放平台返回 expires_in 为字符串及数字的不同情况
+	tests := []struct {
+		name       string
+		respJSON   string
+		wantExpire int
+		wantErr    bool
+	}{
+		{
+			name:       "expires_in as string",
+			respJSON:   `{"access_token":"token_str","expires_in":"7200"}`,
+			wantExpire: 7200,
+			wantErr:    false,
+		},
+		{
+			name:       "expires_in as integer",
+			respJSON:   `{"access_token":"token_int","expires_in":7200}`,
+			wantExpire: 7200,
+			wantErr:    false,
+		},
+		{
+			name:       "missing access_token",
+			respJSON:   `{"code":-1,"msg":"invalid secret"}`,
+			wantExpire: 0,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(tt.respJSON))
+			}))
+			defer server.Close()
+
+			mgr := NewTokenManager(server.URL, nil)
+			token, err := mgr.GetAccessToken(context.Background(), "appid", "secret")
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("GetAccessToken error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantErr && token == "" {
+				t.Fatalf("expected non-empty token")
+			}
+		})
+	}
+}
+

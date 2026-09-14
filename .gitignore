@@ -2,11 +2,11 @@
 /.idea
 
 /main.go
-/build/plugins
-/build/conf
 /napcat-onebot
+/conf
 /plugin
 /data
+*.exe
 
 # LLMs
 CLAUDE.md

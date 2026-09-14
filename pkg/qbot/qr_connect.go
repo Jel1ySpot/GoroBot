@@ -80,7 +80,7 @@ func (s *Service) QRConnect(ctx context.Context) (*QRCredentials, error) {
 		keyBase64 := base64.StdEncoding.EncodeToString(key)
 
 		// 2. 创建绑定任务
-		taskID, err := createBindTask(ctx, client, keyBase64)
+		taskID, err := s.createBindTask(ctx, client, keyBase64)
 		if err != nil {
 			s.logWarning("QBot 创建扫码绑定任务失败: %v，3秒后重试...", err)
 			select {
@@ -125,7 +125,8 @@ func (s *Service) displayQRCode(connectURL string) {
 	fmt.Println("=================================================================")
 }
 
-func createBindTask(ctx context.Context, client *http.Client, keyBase64 string) (string, error) {
+func (s *Service) createBindTask(ctx context.Context, client *http.Client, keyBase64 string) (string, error) {
+	s.logDebug("QBot QR >>> POST %s (创建扫码绑定任务)", BindTaskCreateURL)
 	bodyBytes, err := json.Marshal(bindTaskReq{Key: keyBase64})
 	if err != nil {
 		return "", err
@@ -158,6 +159,7 @@ func createBindTask(ctx context.Context, client *http.Client, keyBase64 string) 
 		return "", fmt.Errorf("create bind task failed (code %d: %s)", res.Retcode, res.Msg)
 	}
 
+	s.logDebug("QBot QR <<< [%d] 扫码任务创建成功 (task_id: %s)", resp.StatusCode, res.Data.TaskID)
 	return res.Data.TaskID, nil
 }
 
@@ -170,7 +172,7 @@ func (s *Service) pollUntilCompleted(ctx context.Context, client *http.Client, t
 		case <-ctx.Done():
 			return nil, false, ctx.Err()
 		case <-ticker.C:
-			res, err := pollBindResult(ctx, client, taskID)
+			res, err := s.pollBindResult(ctx, client, taskID)
 			if err != nil {
 				s.logDebug("QBot poll bind result error: %v", err)
 				continue
@@ -198,7 +200,8 @@ func (s *Service) pollUntilCompleted(ctx context.Context, client *http.Client, t
 	}
 }
 
-func pollBindResult(ctx context.Context, client *http.Client, taskID string) (*pollResultResp, error) {
+func (s *Service) pollBindResult(ctx context.Context, client *http.Client, taskID string) (*pollResultResp, error) {
+	s.logDebug("QBot QR >>> POST %s (查询扫码状态, task_id: %s)", BindResultPollURL, taskID)
 	bodyBytes, err := json.Marshal(pollResultReq{TaskID: taskID})
 	if err != nil {
 		return nil, err
@@ -231,6 +234,7 @@ func pollBindResult(ctx context.Context, client *http.Client, taskID string) (*p
 		return nil, fmt.Errorf("poll bind result failed (code %d: %s)", res.Retcode, res.Msg)
 	}
 
+	s.logDebug("QBot QR <<< [%d] 扫码状态: %d (%s)", resp.StatusCode, res.Data.Status, res.Msg)
 	return &res, nil
 }
 

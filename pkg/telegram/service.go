@@ -118,6 +118,7 @@ func (s *Service) handleUpdate(ctx context.Context, b *bot.Bot, update *models.U
 
 	msgCtx := NewMessageContext(update.Message, s)
 	text := msgCtx.String()
+	s.logger.Debug("Telegram 收到消息 (ChatID: %d, MessageID: %d, Content: %s)", update.Message.Chat.ID, update.Message.ID, text)
 
 	if strings.HasPrefix(text, "/") {
 		cmd := strings.TrimSpace(strings.TrimPrefix(text, "/"))
@@ -161,6 +162,7 @@ func (s *Service) SyncCommands() {
 		return
 	}
 
+	s.logger.Debug("正在向 Telegram 服务端同步 %d 个命令...", len(cmds))
 	_, err := s.bot.SetMyCommands(s.ctx, &bot.SetMyCommandsParams{
 		Commands: cmds,
 	})
@@ -277,6 +279,7 @@ func (s *Service) DownloadResourceFromRefLink(refLink string) (string, error) {
 		target = filepath.Join("resources", uuid.NewString()+ext)
 	}
 
+	s.logger.Debug("Telegram 正在下载资源: %s -> %s", rawURL, target)
 	resp, err := http.Get(rawURL)
 	if err != nil {
 		return "", fmt.Errorf("download resource failed: %w", err)
@@ -296,6 +299,7 @@ func (s *Service) DownloadResourceFromRefLink(refLink string) (string, error) {
 		return "", fmt.Errorf("create dir failed: %w", err)
 	}
 
+	s.logger.Debug("Telegram 写入资源文件: %s (%d 字节)", target, len(data))
 	if err := os.WriteFile(target, data, 0644); err != nil {
 		return "", fmt.Errorf("write file failed: %w", err)
 	}

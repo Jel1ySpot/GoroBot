@@ -161,10 +161,12 @@ func (s *Service) saveSig() {
 		s.logger.Error("marshal sig.bin err: %s", err)
 		return
 	}
-	err = os.WriteFile(path.Join(s.ConfigPath, s.config.Account.SigPath), data, 0644)
+	sigFile := path.Join(s.ConfigPath, s.config.Account.SigPath)
+	s.logger.Debug("Lagrange 正在保存签名凭证文件: %s (%d 字节)", sigFile, len(data))
+	err = os.WriteFile(sigFile, data, 0644)
 	if err != nil {
 		s.logger.Error("write sig.bin err: %s", err)
 		return
 	}
-	s.logger.Success("sig saved into %s", path.Join(s.ConfigPath, s.config.Account.SigPath))
+	s.logger.Success("sig saved into %s", sigFile)
 }

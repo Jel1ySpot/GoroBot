@@ -19,6 +19,7 @@ const (
 	StickerElement
 	LinkElement
 	InlineKeyboardElement
+	MarkdownElement
 	OtherElement
 )
 

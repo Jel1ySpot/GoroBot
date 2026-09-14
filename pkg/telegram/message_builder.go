@@ -35,6 +35,17 @@ func (m *MessageBuilder) Text(text string) botc.MessageBuilder {
 	return m
 }
 
+func (m *MessageBuilder) Markdown(content string) botc.MessageBuilder {
+	if m.err != nil {
+		return m
+	}
+	m.elements = append(m.elements, &botc.MessageElement{
+		Type:    botc.MarkdownElement,
+		Content: content,
+	})
+	return m
+}
+
 func (m *MessageBuilder) Quote(msg *botc.BaseMessage) botc.MessageBuilder {
 	if m.err != nil {
 		return m
@@ -168,48 +179,54 @@ func (m *MessageBuilder) Send(id string) (*botc.BaseMessage, error) {
 
 // sendToChat 根据消息元素发送文本或图片消息
 func (s *Service) sendToChat(chatID int64, elements []*botc.MessageElement) (*botc.BaseMessage, error) {
-	text := extractText(elements)
+	text, isMarkdown := extractText(elements)
 	photoSource := firstImageSource(s, elements)
 	markup := extractReplyMarkup(elements)
 
 	ctx := context.Background()
 
 	if photoSource != "" {
-		return s.sendPhotoWithMarkup(ctx, chatID, photoSource, text, markup)
+		return s.sendPhotoWithMarkup(ctx, chatID, photoSource, text, markup, isMarkdown)
 	}
-	return s.sendTextWithMarkup(ctx, chatID, text, markup)
+	return s.sendTextWithMarkup(ctx, chatID, text, markup, isMarkdown)
 }
 
 func (s *Service) sendText(ctx context.Context, chatID int64, text string) (*botc.BaseMessage, error) {
-	return s.sendTextWithMarkup(ctx, chatID, text, nil)
+	return s.sendTextWithMarkup(ctx, chatID, text, nil, false)
 }
 
-func (s *Service) sendTextWithMarkup(ctx context.Context, chatID int64, text string, markup models.ReplyMarkup) (*botc.BaseMessage, error) {
+func (s *Service) sendTextWithMarkup(ctx context.Context, chatID int64, text string, markup models.ReplyMarkup, isMarkdown ...bool) (*botc.BaseMessage, error) {
 	if text == "" {
 		text = "(空消息)"
 	}
+	s.logger.Debug("Telegram 发送文本消息 >>> ChatID: %d, Text: %s", chatID, text)
 	params := &bot.SendMessageParams{
 		ChatID: chatID,
 		Text:   text,
+	}
+	if len(isMarkdown) > 0 && isMarkdown[0] {
+		params.ParseMode = models.ParseModeMarkdown
 	}
 	if markup != nil {
 		params.ReplyMarkup = markup
 	}
 	msg, err := s.bot.SendMessage(ctx, params)
 	if err != nil {
+		s.logger.Debug("Telegram 发送文本消息失败: %v", err)
 		return nil, err
 	}
 	return ParseMessage(msg, s), nil
 }
 
 func (s *Service) sendPhoto(ctx context.Context, chatID int64, source string, caption string) (*botc.BaseMessage, error) {
-	return s.sendPhotoWithMarkup(ctx, chatID, source, caption, nil)
+	return s.sendPhotoWithMarkup(ctx, chatID, source, caption, nil, false)
 }
 
-func (s *Service) sendPhotoWithMarkup(ctx context.Context, chatID int64, source string, caption string, markup models.ReplyMarkup) (*botc.BaseMessage, error) {
+func (s *Service) sendPhotoWithMarkup(ctx context.Context, chatID int64, source string, caption string, markup models.ReplyMarkup, isMarkdown ...bool) (*botc.BaseMessage, error) {
 	var photo models.InputFile
 
 	if data, err := os.ReadFile(source); err == nil {
+		s.logger.Debug("Telegram 读取本地图片文件成功: %s (%d 字节)", source, len(data))
 		photo = &models.InputFileUpload{
 			Filename: "image.jpg",
 			Data:     bytes.NewReader(data),
@@ -218,10 +235,14 @@ func (s *Service) sendPhotoWithMarkup(ctx context.Context, chatID int64, source 
 		photo = &models.InputFileString{Data: source}
 	}
 
+	s.logger.Debug("Telegram 发送图片消息 >>> ChatID: %d, Source: %s", chatID, source)
 	params := &bot.SendPhotoParams{
 		ChatID:  chatID,
 		Photo:   photo,
 		Caption: caption,
+	}
+	if len(isMarkdown) > 0 && isMarkdown[0] {
+		params.ParseMode = models.ParseModeMarkdown
 	}
 	if markup != nil {
 		params.ReplyMarkup = markup
@@ -249,18 +270,22 @@ func firstImageSource(s *Service, elements []*botc.MessageElement) string {
 	return ""
 }
 
-func extractText(elements []*botc.MessageElement) string {
+func extractText(elements []*botc.MessageElement) (string, bool) {
 	if len(elements) == 0 {
-		return ""
+		return "", false
 	}
 	var builder strings.Builder
+	isMarkdown := false
 	for _, elem := range elements {
 		switch elem.Type {
 		case botc.TextElement, botc.MentionElement, botc.StickerElement, botc.QuoteElement:
 			builder.WriteString(elem.Content)
+		case botc.MarkdownElement:
+			builder.WriteString(elem.Content)
+			isMarkdown = true
 		}
 	}
-	return builder.String()
+	return builder.String(), isMarkdown
 }
 
 func extractReplyMarkup(elements []*botc.MessageElement) models.ReplyMarkup {

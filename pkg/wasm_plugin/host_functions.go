@@ -222,7 +222,15 @@ func (s *Service) createHostFunctions(inst *PluginInstance) []extism.HostFunctio
 			if len(out) > 0 {
 				reply := strings.TrimSpace(string(out))
 				if reply != "" {
-					_, _ = cmdCtx.ReplyText(reply)
+					if cmdCtx.SupportsFeature(botc.FeatureMarkdown) && isMarkdownContent(reply) {
+						builder := cmdCtx.NewMessageBuilder().Markdown(reply)
+						if _, err := builder.ReplyTo(cmdCtx); err != nil {
+							s.logger.Debug("插件 %s 使用 Markdown 回复失败 (%v)，回退为纯文本回复", inst.id, err)
+							_, _ = cmdCtx.ReplyText(reply)
+						}
+					} else {
+						_, _ = cmdCtx.ReplyText(reply)
+					}
 				}
 			}
 			return nil
@@ -256,6 +264,15 @@ func (s *Service) createHostFunctions(inst *PluginInstance) []extism.HostFunctio
 		if !ok || msgCtx == nil {
 			stack[0] = 1
 			return
+		}
+
+		if msgCtx.SupportsFeature(botc.FeatureMarkdown) && isMarkdownContent(text) {
+			builder := msgCtx.NewMessageBuilder().Markdown(text)
+			if _, err := builder.ReplyTo(msgCtx); err == nil {
+				stack[0] = 0
+				return
+			}
+			s.logger.Debug("插件 %s 使用 Markdown 回复失败，回退为纯文本回复", inst.id)
 		}
 
 		if _, err := msgCtx.ReplyText(text); err != nil {
@@ -297,7 +314,12 @@ func (s *Service) createHostFunctions(inst *PluginInstance) []extism.HostFunctio
 			return
 		}
 
-		builder := botCtx.NewMessageBuilder().Text(req.Text)
+		builder := botCtx.NewMessageBuilder()
+		if req.Markdown != "" {
+			builder.Markdown(req.Markdown)
+		} else {
+			builder.Text(req.Text)
+		}
 		if req.Keyboard != nil && len(req.Keyboard.Rows) > 0 {
 			kb := botc.NewInlineKeyboard()
 			for _, r := range req.Keyboard.Rows {
@@ -354,7 +376,12 @@ func (s *Service) createHostFunctions(inst *PluginInstance) []extism.HostFunctio
 			return
 		}
 
-		builder := msgCtx.NewMessageBuilder().Text(req.Text)
+		builder := msgCtx.NewMessageBuilder()
+		if req.Markdown != "" {
+			builder.Markdown(req.Markdown)
+		} else {
+			builder.Text(req.Text)
+		}
 		if req.Keyboard != nil && len(req.Keyboard.Rows) > 0 {
 			kb := botc.NewInlineKeyboard()
 			for _, r := range req.Keyboard.Rows {
@@ -663,6 +690,7 @@ func (s *Service) createHostFunctions(inst *PluginInstance) []extism.HostFunctio
 			stack[0] = 0
 			return
 		}
+		s.logger.Debug("Wasm 插件 %s 读取文件: %s", inst.id, safePath)
 		data, err := os.ReadFile(safePath)
 		if err != nil {
 			stack[0] = 0
@@ -687,6 +715,7 @@ func (s *Service) createHostFunctions(inst *PluginInstance) []extism.HostFunctio
 			stack[0] = 1
 			return
 		}
+		s.logger.Debug("Wasm 插件 %s 写入文件: %s (%d 字节)", inst.id, safePath, len(data))
 		if err := os.MkdirAll(filepath.Dir(safePath), 0755); err != nil {
 			stack[0] = 2
 			return
@@ -727,4 +756,20 @@ func (s *Service) writeJsonResponse(p *extism.CurrentPlugin, stack []uint64, v a
 		return
 	}
 	stack[0] = offset
+}
+
+func isMarkdownContent(s string) bool {
+	lines := strings.Split(s, "\n")
+	for _, l := range lines {
+		trimmed := strings.TrimSpace(l)
+		if strings.HasPrefix(trimmed, "#") ||
+			strings.HasPrefix(trimmed, "- ") ||
+			strings.HasPrefix(trimmed, "* ") ||
+			strings.HasPrefix(trimmed, "+ ") ||
+			strings.HasPrefix(trimmed, "> ") ||
+			strings.HasPrefix(trimmed, "```") {
+			return true
+		}
+	}
+	return strings.Contains(s, "**") || strings.Contains(s, "```") || strings.Contains(s, "![")
 }

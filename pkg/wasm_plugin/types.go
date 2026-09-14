@@ -107,14 +107,16 @@ type InlineKeyboardPayload struct {
 type SendMessageRequest struct {
 	BotContextID string                 `json:"context_id,omitempty"` // 可选，指定机器人上下文ID
 	TargetID     string                 `json:"target_id"`            // 接收者 ID (User/Group 或统一 Entity ID)
-	Text         string                 `json:"text"`                 // 发送的文本内容
+	Text         string                 `json:"text,omitempty"`       // 发送的普通文本内容
+	Markdown     string                 `json:"markdown,omitempty"`   // 可选 Markdown 文本内容
 	Keyboard     *InlineKeyboardPayload `json:"keyboard,omitempty"`   // 可选内嵌键盘
 }
 
-// ReplyMessageRequest 是针对当前上下文的回复请求参数（支持带内嵌键盘）
+// ReplyMessageRequest 是针对当前上下文的回复请求参数（支持带内嵌键盘与 Markdown）
 type ReplyMessageRequest struct {
 	ContextToken string                 `json:"context_token"`
-	Text         string                 `json:"text"`
+	Text         string                 `json:"text,omitempty"`     // 回复的普通文本内容
+	Markdown     string                 `json:"markdown,omitempty"` // 可选 Markdown 文本内容
 	Keyboard     *InlineKeyboardPayload `json:"keyboard,omitempty"`
 }
 

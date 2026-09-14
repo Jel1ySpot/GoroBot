@@ -89,6 +89,7 @@ func (s *Service) initConfig() error {
 		if err := c.WriteConfig(); err != nil {
 			return fmt.Errorf("failed to write default config: %v", err)
 		}
+		s.logger.Debug("已生成 OneBot 默认配置文件: %s", configPath)
 
 		s.logger.Warning("OneBot config file created at %s with default settings", configPath)
 		s.logger.Warning("Please configure the OneBot connection settings in %s and restart", configPath)
@@ -97,9 +98,11 @@ func (s *Service) initConfig() error {
 		return fmt.Errorf("OneBot configuration required - please edit %s and restart", configPath)
 	}
 
+	s.logger.Debug("正在读取 OneBot 配置文件: %s", configPath)
 	if err := c.ReadConfig(); err != nil {
 		return fmt.Errorf("failed to read OneBot config from %s: %v", configPath, err)
 	}
+	s.logger.Debug("OneBot 配置文件读取完成 (mode: %s, debug: %v)", s.config.Mode, s.config.Debug)
 
 	// Validate configuration
 	if err := s.validateConfig(); err != nil {

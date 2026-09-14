@@ -32,6 +32,10 @@ func (mb *MessageBuilder) Text(text string) botc.MessageBuilder {
 	return mb
 }
 
+func (mb *MessageBuilder) Markdown(content string) botc.MessageBuilder {
+	return mb.Text(content)
+}
+
 func (mb *MessageBuilder) Quote(msg *botc.BaseMessage) botc.MessageBuilder {
 	if mb.err != nil {
 		return mb

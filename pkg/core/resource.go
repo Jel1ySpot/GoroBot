@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Jel1ySpot/GoroBot/pkg/core/logger"
 	"github.com/google/uuid"
 )
 
@@ -60,6 +61,7 @@ func (i *Instant) SaveResourceLink(contextID string, refLink string) string {
 
 // LoadResourceFromID 使用资源 ID 加载本地文件路径，必要时通过协议适配器下载
 func (i *Instant) LoadResourceFromID(id string) (string, error) {
+	i.logger.Debug("正在根据资源 ID 加载资源: %s", id)
 	res, ok := i.resourceMap[id]
 
 	if dbRes, err := i.loadResourceFromDB(id); err == nil {
@@ -73,6 +75,7 @@ func (i *Instant) LoadResourceFromID(id string) (string, error) {
 
 	if res.FilePath != "" {
 		if _, err := os.Stat(res.FilePath); err == nil {
+			i.logger.Debug("资源文件已存在于本地: %s (ID: %s)", res.FilePath, id)
 			return res.FilePath, nil
 		}
 	}
@@ -91,6 +94,7 @@ func (i *Instant) LoadResourceFromID(id string) (string, error) {
 	targetPath := buildTargetPath(id, res.RefLink)
 	refLink := withTarget(res.RefLink, targetPath)
 
+	i.logger.Debug("通过适配器 %s 下载远程资源: %s -> %s", res.Protocol, refLink, targetPath)
 	path, err := downloader.DownloadResourceFromRefLink(refLink)
 	if err != nil {
 		_ = i.updateResourcePathOrError(id, targetPath, err.Error())
@@ -105,6 +109,7 @@ func (i *Instant) LoadResourceFromID(id string) (string, error) {
 		return "", err
 	}
 
+	i.logger.Debug("资源下载完成并写入本地: %s (ID: %s)", path, id)
 	return path, nil
 }
 
@@ -167,10 +172,11 @@ func (i *Instant) SaveRemoteResource(resourceURL string) (*Resource, error) {
 		return nil, fmt.Errorf("resourceURL is empty")
 	}
 
+	i.logger.Debug("开始获取远程资源: %s", resourceURL)
 	currentTime := time.Now()
 	resourceDirPath := path.Join("resources", currentTime.Format("2006/01.02"))
 
-	data, fileName, err := downloadFileWithRetry(resourceURL)
+	data, fileName, err := downloadFileWithRetry(resourceURL, i.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -189,6 +195,7 @@ func (i *Instant) SaveRemoteResource(resourceURL string) (*Resource, error) {
 		}
 	}
 
+	i.logger.Debug("写入远程资源文件: %s (%d 字节)", filePath, len(data))
 	if err := os.WriteFile(filePath, data, 0644); err != nil {
 		return nil, fmt.Errorf("failed to write resource file %s: %v", filePath, err)
 	}
@@ -224,6 +231,7 @@ func (i *Instant) SaveResourceData(data []byte, ext string) (string, error) {
 		return "", fmt.Errorf("failed to create resource directory %s: %v", resourceDirPath, err)
 	}
 
+	i.logger.Debug("写入资源文件数据: %s (%d 字节)", resourceFilePath, len(data))
 	resource := Resource{
 		ID:         id,
 		Protocol:   "local",
@@ -325,34 +333,53 @@ func (i *Instant) GetResourceData(resourceID string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return os.ReadFile(resource.FilePath)
+	i.logger.Debug("正在读取本地资源文件: %s (ID: %s)", resource.FilePath, resourceID)
+	data, err := os.ReadFile(resource.FilePath)
+	if err != nil {
+		i.logger.Debug("读取本地资源文件失败: %s: %v", resource.FilePath, err)
+		return nil, err
+	}
+	i.logger.Debug("本地资源文件读取成功: %s (%d 字节)", resource.FilePath, len(data))
+	return data, nil
 }
 
 // downloadFileWithRetry 尝试下载文件，带有重试机制
-func downloadFileWithRetry(url string, retryCount ...int) (data []byte, fileName string, err error) {
+func downloadFileWithRetry(url string, log logger.Inst, retryCount ...int) (data []byte, fileName string, err error) {
 	maxRetries := 5
 	if len(retryCount) > 0 && retryCount[0] >= 0 {
 		maxRetries = retryCount[0]
 	}
 
 	for retries := 0; retries < maxRetries; retries++ {
-		data, fileName, err = downloadFile(url)
+		data, fileName, err = downloadFile(url, log)
 		if err == nil {
 			return
+		}
+		if log != nil {
+			log.Debug("下载网络资源失败，重试 (%d/%d): %v", retries+1, maxRetries, err)
 		}
 	}
 
 	return
 }
 
-func downloadFile(url string) (data []byte, fileName string, err error) {
+func downloadFile(url string, log logger.Inst) (data []byte, fileName string, err error) {
+	if log != nil {
+		log.Debug("HTTP GET 请求资源 >>> %s", url)
+	}
 	resp, err := http.Get(url)
 	if err != nil {
+		if log != nil {
+			log.Debug("HTTP GET 请求资源失败: %v", err)
+		}
 		return nil, "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		if log != nil {
+			log.Debug("HTTP GET 请求资源状态码异常: %d", resp.StatusCode)
+		}
 		return nil, "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
@@ -365,8 +392,18 @@ func downloadFile(url string) (data []byte, fileName string, err error) {
 	}
 
 	data, err = io.ReadAll(resp.Body)
-	if err == nil && len(ext) > 0 {
+	if err != nil {
+		if log != nil {
+			log.Debug("读取网络资源数据流失败: %v", err)
+		}
+		return nil, "", err
+	}
+
+	if len(ext) > 0 {
 		fileName = calcMd5(data) + "." + ext[0]
+	}
+	if log != nil {
+		log.Debug("HTTP GET 请求资源完成 <<< [%d] 接收 %d 字节, 文件名: %s", resp.StatusCode, len(data), fileName)
 	}
 	return
 }

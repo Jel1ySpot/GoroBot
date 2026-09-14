@@ -3,6 +3,7 @@ package bot_context
 type MessageBuilder interface {
 	Protocol() string
 	Text(text string) MessageBuilder
+	Markdown(content string) MessageBuilder
 	Quote(msg *BaseMessage) MessageBuilder
 	Mention(id string) MessageBuilder
 	ImageFromFile(path string) MessageBuilder

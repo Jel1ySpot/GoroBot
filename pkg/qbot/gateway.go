@@ -88,6 +88,7 @@ func (g *GatewayConnection) connect(ctx context.Context) error {
 		return fmt.Errorf("get gateway url: %w", err)
 	}
 
+	g.service.logDebug("QBot 正在连接 WebSocket Gateway: %s", gatewayURL)
 	dialer := websocket.Dialer{
 		HandshakeTimeout: 10 * time.Second,
 	}
@@ -139,6 +140,12 @@ func (g *GatewayConnection) connect(ctx context.Context) error {
 			g.lastSeq = payload.S
 			g.mu.Unlock()
 		}
+
+		seqInfo := "none"
+		if payload.S != nil {
+			seqInfo = fmt.Sprintf("%d", *payload.S)
+		}
+		g.service.logDebug("QBot Gateway <<< op: %d, t: %s, s: %s", payload.Op, payload.T, seqInfo)
 
 		switch payload.Op {
 		case GatewayOpHello:
@@ -224,6 +231,11 @@ func (g *GatewayConnection) heartbeatLoop(ctx context.Context, interval time.Dur
 				Op: GatewayOpHeartbeat,
 				D:  g.lastSeq,
 			}
+			seqStr := "none"
+			if g.lastSeq != nil {
+				seqStr = fmt.Sprintf("%d", *g.lastSeq)
+			}
+			g.service.logDebug("QBot Gateway >>> 发送心跳包 (seq: %s)", seqStr)
 			_ = g.wsConn.WriteJSON(hb)
 			g.mu.Unlock()
 		}
@@ -240,6 +252,7 @@ func (g *GatewayConnection) sendIdentifyOrResume(ctx context.Context) error {
 	defer g.mu.Unlock()
 
 	if g.sessionID != "" && g.lastSeq != nil {
+		g.service.logDebug("QBot Gateway >>> 发送 Resume (sessionId: %s, seq: %d)", g.sessionID, *g.lastSeq)
 		resumePayload := struct {
 			Op int `json:"op"`
 			D  struct {
@@ -267,6 +280,7 @@ func (g *GatewayConnection) sendIdentifyOrResume(ctx context.Context) error {
 		intents = FullIntents
 	}
 
+	g.service.logDebug("QBot Gateway >>> 发送 Identify (intents: %d)", intents)
 	identifyPayload := struct {
 		Op int `json:"op"`
 		D  struct {

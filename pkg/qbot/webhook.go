@@ -71,6 +71,8 @@ func (s *Service) WebhookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.logDebug("QBot Webhook <<< 收到请求 %s %s (数据大小: %d 字节)", r.Method, r.URL.Path, len(body))
+
 	var payload WSPayload
 	if err := json.Unmarshal(body, &payload); err != nil {
 		http.Error(w, "Invalid json", http.StatusBadRequest)
@@ -88,9 +90,11 @@ func (s *Service) WebhookHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		s.logInfo("QBot handling webhook callback URL validation")
+		s.logDebug("QBot Webhook 处理 URL 校验 (plain_token: %s, event_ts: %s)", val.PlainToken, val.EventTs)
 		respData := signValidationResponse(val.PlainToken, val.EventTs, secret)
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(respData)
+		s.logDebug("QBot Webhook >>> 返回 URL 校验签名响应")
 		return
 	}
 
@@ -109,9 +113,11 @@ func (s *Service) WebhookHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid signature", http.StatusUnauthorized)
 		return
 	}
+	s.logDebug("QBot Webhook 签名校验通过 (Timestamp: %s)", timestamp)
 
 	// 3. op: 0 业务事件分发 (异步处理，立即返回 op: 12 ACK)
 	if payload.Op == OpDispatch {
+		s.logDebug("QBot Webhook 接收到业务事件 (t: %s)", payload.T)
 		go func(p WSPayload) {
 			if err := s.handleWebhookDispatch(&p); err != nil {
 				s.logError("QBot dispatch event failed: %v", err)
@@ -120,6 +126,7 @@ func (s *Service) WebhookHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 立即返回 op: 12 ACK
+	s.logDebug("QBot Webhook >>> 返回 op: 12 ACK")
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(WebhookAck{
 		Op: OpHttpCallbackAck,

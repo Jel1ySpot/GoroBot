@@ -48,6 +48,7 @@ func (s *Service) handleHTTPPostEvent(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	s.logger.Debug("OneBot HTTP POST 收到事件上报 (来自: %s, 数据大小: %d 字节)", r.RemoteAddr, len(body))
 
 	// Process event
 	if err := s.processEvent(body); err != nil {

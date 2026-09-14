@@ -76,6 +76,10 @@ func (b *MessageBuilder) Text(text string) botc.MessageBuilder {
 	return b
 }
 
+func (b *MessageBuilder) Markdown(content string) botc.MessageBuilder {
+	return b.Text(content)
+}
+
 func (b *MessageBuilder) ImageFromFile(path string) botc.MessageBuilder {
 	if b.err != nil {
 		return b

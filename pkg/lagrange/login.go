@@ -20,14 +20,19 @@ func (s *Service) login() error {
 	qqClient.UseVersion(appInfo)
 	qqClient.AddSignServer(s.config.SignServerUrl)
 
-	deviceInfo, err := auth.LoadOrSaveDevice(path.Join(DefaultConfigPath, "device.json"))
+	devicePath := path.Join(DefaultConfigPath, "device.json")
+	s.logger.Debug("Lagrange 读取设备配置文件: %s", devicePath)
+	deviceInfo, err := auth.LoadOrSaveDevice(devicePath)
 	if err != nil {
 		return err
 	}
 	qqClient.UseDevice(deviceInfo)
 
-	data, err := os.ReadFile(path.Join(DefaultConfigPath, s.config.Account.SigPath))
+	sigPath := path.Join(DefaultConfigPath, s.config.Account.SigPath)
+	s.logger.Debug("Lagrange 读取签名凭证文件: %s", sigPath)
+	data, err := os.ReadFile(sigPath)
 	if err == nil {
+		s.logger.Debug("Lagrange 签名凭证文件读取成功 (%d 字节)", len(data))
 		sig, err := auth.UnmarshalSigInfo(data, true)
 		if err != nil {
 			s.logger.Warning("load sig error: %s", err)

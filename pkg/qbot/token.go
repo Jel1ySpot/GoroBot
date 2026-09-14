@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -53,10 +54,10 @@ type tokenReq struct {
 }
 
 type tokenResp struct {
-	AccessToken string `json:"access_token"`
-	ExpiresIn   int    `json:"expires_in"`
-	Msg         string `json:"msg,omitempty"`
-	Code        int    `json:"code,omitempty"`
+	AccessToken string      `json:"access_token"`
+	ExpiresIn   json.Number `json:"expires_in"`
+	Msg         string      `json:"msg,omitempty"`
+	Code        int         `json:"code,omitempty"`
 }
 
 // GetAccessToken 获取 Access Token，优先读取未过期缓存
@@ -66,6 +67,9 @@ func (m *TokenManager) GetAccessToken(ctx context.Context, appID, clientSecret s
 	if ok && time.Now().Add(5*time.Minute).Before(cached.ExpiresAt) {
 		token := cached.Token
 		m.mu.RUnlock()
+		if m.logger != nil {
+			m.logger.Debug("命中 QBot AccessToken 缓存 (appId: %s, 剩余有效时间: %v)", appID, time.Until(cached.ExpiresAt).Round(time.Second))
+		}
 		return token, nil
 	}
 	m.mu.RUnlock()
@@ -75,6 +79,9 @@ func (m *TokenManager) GetAccessToken(ctx context.Context, appID, clientSecret s
 
 	// 双重检查
 	if cached, ok := m.tokens[appID]; ok && time.Now().Add(5*time.Minute).Before(cached.ExpiresAt) {
+		if m.logger != nil {
+			m.logger.Debug("命中 QBot AccessToken 缓存 (appId: %s, 剩余有效时间: %v)", appID, time.Until(cached.ExpiresAt).Round(time.Second))
+		}
 		return cached.Token, nil
 	}
 
@@ -94,6 +101,9 @@ func (m *TokenManager) GetAccessToken(ctx context.Context, appID, clientSecret s
 // fetchToken 发起 HTTP POST 获取 Token
 func (m *TokenManager) fetchToken(ctx context.Context, appID, clientSecret string) (string, int, error) {
 	url := fmt.Sprintf("%s%s", m.baseURL, TokenPath)
+	if m.logger != nil {
+		m.logger.Debug("QBot Token >>> POST %s (appId: %s)", url, appID)
+	}
 
 	bodyBytes, err := json.Marshal(tokenReq{
 		AppID:        appID,
@@ -134,9 +144,20 @@ func (m *TokenManager) fetchToken(ctx context.Context, appID, clientSecret strin
 		return "", 0, fmt.Errorf("token response missing access_token (code %d: %s)", res.Code, res.Msg)
 	}
 
-	expiresIn := res.ExpiresIn
+	var expiresIn int
+	if exp, err := res.ExpiresIn.Int64(); err == nil && exp > 0 {
+		expiresIn = int(exp)
+	} else if expStr := res.ExpiresIn.String(); expStr != "" {
+		if expVal, err := strconv.Atoi(expStr); err == nil && expVal > 0 {
+			expiresIn = expVal
+		}
+	}
 	if expiresIn <= 0 {
 		expiresIn = 7200
+	}
+
+	if m.logger != nil {
+		m.logger.Debug("QBot Token <<< [%d] 获取 AccessToken 成功 (expires_in: %ds)", resp.StatusCode, expiresIn)
 	}
 
 	return res.AccessToken, expiresIn, nil

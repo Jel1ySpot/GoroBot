@@ -75,6 +75,10 @@ func (b *mockBuilder) Text(text string) botc.MessageBuilder {
 	b.txt = text
 	return b
 }
+func (b *mockBuilder) Markdown(content string) botc.MessageBuilder {
+	b.txt = content
+	return b
+}
 func (b *mockBuilder) Quote(msg *botc.BaseMessage) botc.MessageBuilder { return b }
 func (b *mockBuilder) Mention(id string) botc.MessageBuilder            { return b }
 func (b *mockBuilder) ImageFromFile(path string) botc.MessageBuilder   { return b }
@@ -163,11 +167,32 @@ func TestWasmHostFunctionsFeaturesAndKeyboard(t *testing.T) {
 	if mockBot.lastSentText != "Hello with button" {
 		t.Fatalf("expected text 'Hello with button', got %s", mockBot.lastSentText)
 	}
+
 	if mockBot.lastSentKeyboard == nil || len(mockBot.lastSentKeyboard.Rows) != 1 {
 		t.Fatalf("expected keyboard with 1 row, got %+v", mockBot.lastSentKeyboard)
 	}
 	if mockBot.lastSentKeyboard.Rows[0][0].Text != "Click me" {
 		t.Fatalf("expected button text 'Click me', got %s", mockBot.lastSentKeyboard.Rows[0][0].Text)
+	}
+
+	// 验证 Markdown 消息发送
+	reqMd := SendMessageRequest{
+		BotContextID: "mock:bot_1",
+		TargetID:     "user_123",
+		Markdown:     "# Markdown Title",
+	}
+	builderMd := mockBot.NewMessageBuilder()
+	if reqMd.Markdown != "" {
+		builderMd.Markdown(reqMd.Markdown)
+	} else {
+		builderMd.Text(reqMd.Text)
+	}
+	_, err = builderMd.Send(reqMd.TargetID)
+	if err != nil {
+		t.Fatalf("send markdown failed: %v", err)
+	}
+	if mockBot.lastSentText != "# Markdown Title" {
+		t.Fatalf("expected text '# Markdown Title', got %s", mockBot.lastSentText)
 	}
 
 	_ = reqBytes

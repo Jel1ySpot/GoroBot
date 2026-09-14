@@ -75,10 +75,10 @@ func (c *Client) Request(ctx context.Context, method, path string, body any, res
 		}
 		bodyReader = bytes.NewReader(reqData)
 
-		if c.debug && c.logger != nil {
+		if c.logger != nil {
 			c.logger.Debug("QBot API >>> %s %s body: %s", method, url, string(reqData))
 		}
-	} else if c.debug && c.logger != nil {
+	} else if c.logger != nil {
 		c.logger.Debug("QBot API >>> %s %s", method, url)
 	}
 
@@ -102,7 +102,7 @@ func (c *Client) Request(ctx context.Context, method, path string, body any, res
 		return fmt.Errorf("read response body failed: %w", err)
 	}
 
-	if c.debug && c.logger != nil {
+	if c.logger != nil {
 		c.logger.Debug("QBot API <<< [%d] %s", resp.StatusCode, string(respBytes))
 	}
 

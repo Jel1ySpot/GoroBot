@@ -41,6 +41,8 @@ func newPluginInstance(s *Service, id string, wasmPath string) (*PluginInstance,
 		return nil, fmt.Errorf("无法获取 Wasm 文件绝对路径: %w", err)
 	}
 
+	s.logger.Debug("Wasm 插件编译加载文件: %s (数据目录: %s)", absWasmPath, absDataDir)
+
 	inst := &PluginInstance{
 		id:      id,
 		path:    absWasmPath,

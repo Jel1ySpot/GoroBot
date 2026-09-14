@@ -37,14 +37,17 @@ func (s *Service) initConfig() error {
 		if err := c.WriteConfig(); err != nil {
 			return fmt.Errorf("failed to write default config: %v", err)
 		}
+		s.logger.Debug("已写入 Telegram 默认配置文件: %s", configPath)
 
 		s.logger.Warning("Telegram 配置文件已生成于 %s，请填写 bot token 后重启", configPath)
 		return fmt.Errorf("telegram config missing token, please configure %s", configPath)
 	}
 
+	s.logger.Debug("正在读取 Telegram 配置文件: %s", configPath)
 	if err := c.ReadConfig(); err != nil {
 		return fmt.Errorf("failed to read Telegram config: %v", err)
 	}
+	s.logger.Debug("Telegram 配置文件读取完成 (server_url: %s)", s.config.ServerURL)
 
 	if s.config.Token == "" {
 		return fmt.Errorf("telegram bot token is empty")
