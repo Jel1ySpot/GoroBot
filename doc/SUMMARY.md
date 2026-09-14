@@ -5,6 +5,7 @@
 # 使用
 
 - [快速入门](getting_started.md)
+- [配置文件](config.md)
 
 # 编写功能代码
 

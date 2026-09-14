@@ -82,6 +82,14 @@
 - Content: `百度一下，你就知道`
 - Source: `https://www.baidu.com`
 
+### InlineKeyboardElement
+- Content: `内嵌键盘 JSON 序列化字符串`
+- Source: `""`
+
+### MarkdownElement
+- Content: `Markdown 格式文本内容`
+- Source: `""`
+
 ### OtherElement
 - Content: `奇怪的东西`
 - Source: `protocol:参数`
@@ -90,7 +98,13 @@
 构建和发送消息的链式 API。通过 `ctx.NewMessageBuilder()` 或 `ctx.BotContext().NewMessageBuilder()` 创建。
 
 ### builder.Text(text string) MessageBuilder
-添加文本内容。
+添加普通文本内容。
+
+### builder.Markdown(content string) MessageBuilder
+添加 Markdown 格式内容（在支持 Markdown 的适配器上如 QBot、Telegram 将按 Markdown 渲染发送，其他平台自动回退为纯文本）。
+
+### builder.InlineKeyboard(kb *InlineKeyboard) MessageBuilder
+添加内嵌键盘按钮组件（在支持 Inline Keyboard 的平台展示交互按钮）。
 
 ### builder.ImageFromFile(path string) MessageBuilder
 从本地文件添加图片。

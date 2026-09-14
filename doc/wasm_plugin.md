@@ -114,15 +114,15 @@ Wasm 插件可以通过导入函数与 GoroBot 宿主进行双向交互。接口
   }
   ```
 
-### 3. 消息回复与主动发送（支持内嵌键盘）
+### 3. 消息回复与主动发送（支持内嵌键盘与 Markdown）
 - **回复文本消息**：`gorobot_reply_text(context_token, text)`
   - 在指令或事件处理上下文中使用收到的 `context_token` 进行即时纯文本回复。
-- **回复富消息（含内嵌键盘）**：`gorobot_reply_message(req_json)`
-  - 支持向当前上下文回复携带内嵌按钮（Inline Keyboard）的消息。
+- **回复富消息（含内嵌键盘与 Markdown）**：`gorobot_reply_message(req_json)`
+  - 支持向当前上下文回复携带内嵌按钮（Inline Keyboard）或 Markdown 格式的消息（`markdown` 字段与 `text` 字段二选一，优先使用 `markdown`）。
   ```json
   {
     "context_token": "...",
-    "text": "请选择你要执行的操作：",
+    "markdown": "# 欢迎使用\n请选择你要执行的操作：",
     "keyboard": {
       "rows": [
         [
@@ -134,12 +134,12 @@ Wasm 插件可以通过导入函数与 GoroBot 宿主进行双向交互。接口
   }
   ```
 - **主动发消息**：`gorobot_send_message(req_json)`
-  - 主动向指定用户或群聊发送消息，同样支持可选的 `keyboard` 结构。
+  - 主动向指定用户或群聊发送消息，同样支持 `markdown` 与可选的 `keyboard` 结构。
   ```json
   {
-    "context_id": "telegram",  // 机器人上下文 ID，留空默认首个可用适配器
-    "target_id": "12345678",   // 接收者 User ID 或 Group ID
-    "text": "你好，这是来自 Wasm 插件的主动推送",
+    "context_id": "qbot:<bot_appid>",           // 机器人上下文 ID，留空默认首个可用适配器
+    "target_id": "qbot:user&<user_openid>",     // 接收者 User ID 或 Group ID
+    "markdown": "## 系统通知\n这是来自 Wasm 插件的主动推送",
     "keyboard": {
       "rows": [
         [
@@ -245,6 +245,72 @@ Wasm 插件可以通过导入函数与 GoroBot 宿主进行双向交互。接口
 - `gorobot_fs_read(path)`：读取 `data/<plugin_id>/` 内的文件内容。
 - `gorobot_fs_write(path, data)`：写入文件到 `data/<plugin_id>/`。
 - 内置防目录穿越逻辑，拦截所有试图逃逸数据目录的相对或绝对路径。
+
+---
+
+## 用户权限与身份体系
+
+宿主在向 Wasm 插件传递指令事件（`CommandEvent`）和消息事件（`MessageEventPayload`）时，会自动解析并注入发送者的身份与权限信息：`sender.authority`。
+
+### 1. 权限等级对应表 (`Authority`)
+
+底层对应 GoroBot 核心实体 `entity.Authority`（整型数值 0 ~ 5）：
+
+| 数值 | 权限标识 | 对应身份 | 说明 |
+| :---: | :--- | :--- | :--- |
+| **0** | `Banned` | 被封禁用户 | 黑名单用户，通常无权触发任何正常交互 |
+| **1** | `Member` | 普通成员 | 群聊普通成员或普通私聊用户（默认值） |
+| **2** | `GroupAdmin` | 群管理员 | 当前群的管理员（仅群聊场景有效） |
+| **3** | `GroupOwner` | 群主 | 当前群的创建者/群主（仅群聊场景有效） |
+| **4** | `Admin` | 机器人管理员 | 被配置为 GoroBot 管理员的用户 |
+| **5** | `Owner` | 机器人所有者 | 机器人最高所有者（拥有全部指令与管理权限） |
+
+### 2. 上下文数据结构
+
+无论在指令回调还是消息事件回调中，均可通过 `sender` 对象获取：
+
+```json
+{
+  "sender_id": "user_67890",
+  "sender": {
+    "id": "user_67890",
+    "name": "张三",
+    "nickname": "三哥",
+    "avatar": "https://...",
+    "authority": 2
+  }
+}
+```
+
+### 3. 插件内鉴权示例（Rust）
+
+```rust
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct SenderInfo {
+    id: String,
+    nickname: Option<String>,
+    #[serde(default)]
+    authority: i32,
+}
+
+#[derive(Deserialize)]
+struct CommandContext {
+    sender: Option<SenderInfo>,
+    raw: String,
+}
+
+// 检查是否具备群管及以上权限
+fn is_admin(ctx: &CommandContext) -> bool {
+    ctx.sender.as_ref().map_or(false, |s| s.authority >= 2)
+}
+
+// 检查是否为机器人最高所有者
+fn is_owner(ctx: &CommandContext) -> bool {
+    ctx.sender.as_ref().map_or(false, |s| s.authority >= 5)
+}
+```
 
 ---
 
